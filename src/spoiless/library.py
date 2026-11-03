@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from spoiless.epub import Book
+from spoiless.epub import Book, NavigationEntry
 
 
 def database_path() -> Path:
@@ -45,6 +45,19 @@ def connect():
                 FOREIGN KEY (book_id, section_position)
                     REFERENCES sections(book_id, position) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS navigation_entries (
+                book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                section_position INTEGER,
+                character_offset INTEGER,
+                CHECK ((section_position IS NULL AND character_offset IS NULL) OR
+                       (section_position IS NOT NULL AND character_offset IS NOT NULL
+                        AND character_offset >= 0)),
+                FOREIGN KEY (book_id, section_position)
+                    REFERENCES sections(book_id, position) ON DELETE CASCADE,
+                PRIMARY KEY (book_id, position)
+            );
         """)
         yield db
     finally:
@@ -60,6 +73,21 @@ def add_book(book: Book) -> str:
             (
                 (book_id, position, section.text)
                 for position, section in enumerate(book.sections)
+            ),
+        )
+        db.executemany(
+            """INSERT INTO navigation_entries
+               (book_id, position, title, section_position, character_offset)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                (
+                    book_id,
+                    index,
+                    entry.title,
+                    entry.section_position,
+                    entry.character_offset,
+                )
+                for index, entry in enumerate(book.navigation)
             ),
         )
     return book_id
@@ -93,6 +121,22 @@ class ReadingUnitStart:
 
 class BookNotFound(ValueError):
     """The requested book is not in the local library."""
+
+
+def get_navigation(book_id: str) -> list[NavigationEntry]:
+    """Return ordered, unconfirmed navigation links, including unresolved links."""
+    with connect() as db:
+        if (
+            db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone()
+            is None
+        ):
+            raise BookNotFound("Book not found.")
+        rows = db.execute(
+            """SELECT title, section_position, character_offset FROM navigation_entries
+               WHERE book_id = ? ORDER BY position""",
+            (book_id,),
+        ).fetchall()
+    return [NavigationEntry(*row) for row in rows]
 
 
 def get_sections(book_id: str) -> list[tuple[int, str]]:

@@ -27,6 +27,12 @@ class SectionResponse(BaseModel):
     text: str
 
 
+class NavigationEntryResponse(BaseModel):
+    title: str | None
+    section_position: int | None
+    character_offset: int | None
+
+
 class ReadingUnitStart(BaseModel):
     kind: Literal["front_matter", "chapter"]
     section_position: int = Field(ge=0, strict=True)
@@ -88,6 +94,26 @@ def sections(book_id: str) -> list[SectionResponse]:
     except library.BookNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
     return [SectionResponse(position=position, text=text) for position, text in rows]
+
+
+@app.get(
+    "/api/books/{book_id}/navigation", response_model=list[NavigationEntryResponse]
+)
+def navigation(
+    book_id: str, include_titles: bool = False
+) -> list[NavigationEntryResponse]:
+    try:
+        entries = library.get_navigation(book_id)
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return [
+        NavigationEntryResponse(
+            title=entry.title if include_titles else None,
+            section_position=entry.section_position,
+            character_offset=entry.character_offset,
+        )
+        for entry in entries
+    ]
 
 
 @app.get("/api/books/{book_id}/reading-units", response_model=list[ReadingUnitStart])
