@@ -65,13 +65,18 @@ def add_book(book: Book) -> str:
     return book_id
 
 
-def list_books() -> list[tuple[str, str, int]]:
+def list_books() -> list[tuple[str, str, int, bool]]:
     with connect() as db:
-        return db.execute("""
-            SELECT books.id, books.title, COUNT(sections.position)
+        rows = db.execute("""
+            SELECT books.id, books.title, COUNT(sections.position),
+                   EXISTS(SELECT 1 FROM reading_units WHERE book_id = books.id)
             FROM books JOIN sections ON books.id = sections.book_id
             GROUP BY books.id ORDER BY books.created_at DESC, books.rowid DESC
         """).fetchall()
+    return [
+        (book_id, title, count, bool(confirmed))
+        for book_id, title, count, confirmed in rows
+    ]
 
 
 def delete_book(book_id: str) -> bool:
@@ -88,6 +93,20 @@ class ReadingUnitStart:
 
 class BookNotFound(ValueError):
     """The requested book is not in the local library."""
+
+
+def get_sections(book_id: str) -> list[tuple[int, str]]:
+    """Return full section text only for an explicitly requested book."""
+    with connect() as db:
+        if (
+            db.execute("SELECT 1 FROM books WHERE id = ?", (book_id,)).fetchone()
+            is None
+        ):
+            raise BookNotFound("Book not found.")
+        return db.execute(
+            "SELECT position, text FROM sections WHERE book_id = ? ORDER BY position",
+            (book_id,),
+        ).fetchall()
 
 
 def confirm_reading_units(book_id: str, units: list[ReadingUnitStart]) -> None:

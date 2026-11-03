@@ -1,7 +1,9 @@
 """Local API entry point."""
 
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from spoiless import library
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
@@ -20,6 +22,21 @@ class BookResponse(BaseModel):
     chapters_confirmed: bool = False
 
 
+class SectionResponse(BaseModel):
+    position: int
+    text: str
+
+
+class ReadingUnitStart(BaseModel):
+    kind: Literal["front_matter", "chapter"]
+    section_position: int = Field(ge=0, strict=True)
+    character_offset: int = Field(ge=0, strict=True)
+
+
+class ReadingUnitsRequest(BaseModel):
+    units: list[ReadingUnitStart] = Field(min_length=1, max_length=10000)
+
+
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok")
@@ -28,8 +45,10 @@ def health() -> HealthResponse:
 @app.get("/api/books", response_model=list[BookResponse])
 def books() -> list[BookResponse]:
     return [
-        BookResponse(id=book_id, title=title, section_count=count)
-        for book_id, title, count in library.list_books()
+        BookResponse(
+            id=book_id, title=title, section_count=count, chapters_confirmed=confirmed
+        )
+        for book_id, title, count, confirmed in library.list_books()
     ]
 
 
@@ -59,4 +78,34 @@ async def import_book(request: Request) -> BookResponse:
 def remove_book(book_id: str) -> Response:
     if not library.delete_book(book_id):
         raise HTTPException(404, "Book not found.")
+    return Response(status_code=204)
+
+
+@app.get("/api/books/{book_id}/sections", response_model=list[SectionResponse])
+def sections(book_id: str) -> list[SectionResponse]:
+    try:
+        rows = library.get_sections(book_id)
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return [SectionResponse(position=position, text=text) for position, text in rows]
+
+
+@app.get("/api/books/{book_id}/reading-units", response_model=list[ReadingUnitStart])
+def reading_units(book_id: str) -> list[ReadingUnitStart]:
+    try:
+        units = library.get_reading_units(book_id)
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return [ReadingUnitStart(**vars(unit)) for unit in units]
+
+
+@app.put("/api/books/{book_id}/reading-units", status_code=204)
+def confirm_units(book_id: str, request: ReadingUnitsRequest) -> Response:
+    units = [library.ReadingUnitStart(**unit.model_dump()) for unit in request.units]
+    try:
+        library.confirm_reading_units(book_id, units)
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return Response(status_code=204)
