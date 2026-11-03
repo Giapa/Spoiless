@@ -8,7 +8,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "lint": "oxlint src vite.config.ts",
     "format": "oxfmt src vite.config.ts",
-    "format:check": "oxfmt --check src vite.config.ts"
+    "format:check": "oxfmt --check src vite.config.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "vue": "^3.5.44",
