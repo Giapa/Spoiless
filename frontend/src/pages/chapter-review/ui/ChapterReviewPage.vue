@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { useChapterReview } from "../model/useChapterReview";
+import { ref } from "vue";
+import NavigationReview from "./NavigationReview.vue";
 import SectionReview from "./SectionReview.vue";
 
 const props = defineProps<{ book: { id: string; title: string } }>();
 const emit = defineEmits<{ back: [] }>();
+const suggestionsDirty = ref(false);
+const suggestionsSaving = ref(false);
 const {
   sections,
   units,
@@ -21,17 +25,38 @@ const {
 } = useChapterReview(props.book.id, () => emit("back"));
 
 function goBack() {
-  if (!dirty.value || window.confirm("Leave without saving your changes?")) emit("back");
+  if (
+    (!dirty.value && !suggestionsDirty.value) ||
+    window.confirm("Leave without saving your changes?")
+  )
+    emit("back");
+}
+
+async function revealManually() {
+  if (suggestionsDirty.value && !window.confirm("Discard your unsaved table-of-contents choices?"))
+    return;
+  await reveal();
+  if (revealed.value) suggestionsDirty.value = false;
 }
 </script>
 
 <template>
   <main>
-    <button class="back" type="button" :disabled="saving" @click="goBack">← Back to library</button>
+    <button class="back" type="button" :disabled="saving || suggestionsSaving" @click="goBack">
+      ← Back to library
+    </button>
     <h1>Review chapters</h1>
     <p class="book-title">{{ book.title }}</p>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
 
+    <NavigationReview
+      v-if="!revealed"
+      :book-id="book.id"
+      :disabled="loading"
+      @saved="emit('back')"
+      @dirty="suggestionsDirty = $event"
+      @busy="suggestionsSaving = $event"
+    />
     <section v-if="!revealed" class="panel" aria-labelledby="warning-title">
       <h2 id="warning-title">This may reveal spoilers</h2>
       <p>
@@ -39,10 +64,15 @@ function goBack() {
         not read.
       </p>
       <p>
-        Chapter boundaries are not detected automatically. You must mark and verify every chapter
-        before saving.
+        Use manual review if the table of contents is missing or incorrect. You must mark and verify
+        every chapter before saving.
       </p>
-      <button class="primary" type="button" :disabled="loading" @click="reveal">
+      <button
+        class="primary"
+        type="button"
+        :disabled="loading || suggestionsSaving"
+        @click="revealManually"
+      >
         {{ loading ? "Loading…" : "Show book text" }}
       </button>
     </section>
