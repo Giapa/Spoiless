@@ -3,7 +3,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from spoiless.epub import InvalidEpub, read_epub
+from spoiless.epub import InvalidEpub, NavigationEntry, read_epub
 
 
 def epub(*, href: str = "one.xhtml", extra: dict[str, str] | None = None) -> bytes:
@@ -55,3 +55,75 @@ def test_reads_spine_order_without_claiming_chapter_boundaries() -> None:
 def test_rejects_unsupported_or_unsafe_files(data: bytes) -> None:
     with pytest.raises(InvalidEpub):
         read_epub(data)
+
+
+def test_epub3_navigation_resolves_anchors_in_normalized_text() -> None:
+    package = """<package xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <metadata><dc:title>Book</dc:title></metadata>
+        <manifest><item id="nav" href="navigation/toc.xhtml" properties="nav"
+             media-type="application/xhtml+xml"/>
+          <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+        </manifest>
+        <spine><itemref idref="one"/></spine></package>"""
+    nav = """<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+        <nav epub:type="toc"><ol>
+          <li><a href="../one.xhtml#begin">Chapter 1</a></li>
+          <li><a href="../one.xhtml#later">Chapter 2</a></li>
+          <li><a href="../one.xhtml#missing">Unknown</a></li>
+          <li><a href="https://example.com/">External</a></li>
+        </ol></nav></body></html>"""
+    text = '<body><p id="begin"> Intro 📚 </p>\n<h2 id="later"> Next </h2></body>'
+    book = read_epub(
+        epub(
+            extra={
+                "book/content.opf": package,
+                "book/navigation/toc.xhtml": nav,
+                "book/one.xhtml": text,
+            }
+        )
+    )
+    assert book.sections[0].text == "Intro 📚\nNext"
+    assert book.navigation == (
+        NavigationEntry("Chapter 1", 0, 0),
+        NavigationEntry("Chapter 2", 0, 8),
+        NavigationEntry("Unknown", None, None),
+        NavigationEntry("External", None, None),
+    )
+
+
+def test_epub2_ncx_navigation_and_ambiguous_fragment() -> None:
+    package = """<package><metadata><title>Book</title></metadata><manifest>
+        <item id="toc" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+        <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+        </manifest><spine toc="toc"><itemref idref="one"/></spine></package>"""
+    ncx = """<ncx><navMap><navPoint><navLabel><text>First</text></navLabel>
+        <content src="one.xhtml#repeat"/></navPoint><navPoint>
+        <navLabel><text>Second</text></navLabel><content src="one.xhtml"/>
+        </navPoint></navMap></ncx>"""
+    text = '<body><p id="repeat">One</p><p id="repeat">Two</p></body>'
+    book = read_epub(
+        epub(
+            extra={
+                "book/content.opf": package,
+                "book/toc.ncx": ncx,
+                "book/one.xhtml": text,
+            }
+        )
+    )
+    assert book.navigation == (
+        NavigationEntry("First", None, None),
+        NavigationEntry("Second", 0, 0),
+    )
+
+
+def test_missing_or_invalid_navigation_does_not_confirm_or_reject_book() -> None:
+    assert read_epub(epub()).navigation == ()
+    package = """<package><manifest>
+        <item id="nav" href="toc.xhtml" properties="nav"
+            media-type="application/xhtml+xml"/>
+        <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+        </manifest><spine><itemref idref="one"/></spine></package>"""
+    book = read_epub(
+        epub(extra={"book/content.opf": package, "book/toc.xhtml": "<broken"})
+    )
+    assert book.sections and book.navigation == ()

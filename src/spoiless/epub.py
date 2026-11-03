@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import PurePosixPath
+from posixpath import dirname, join, normpath
 from urllib.parse import unquote, urlsplit
 from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile, ZipFile
@@ -26,9 +27,19 @@ class Section:
 
 
 @dataclass(frozen=True)
+class NavigationEntry:
+    """An unconfirmed navigation link; unresolved links have no position."""
+
+    title: str
+    section_position: int | None
+    character_offset: int | None
+
+
+@dataclass(frozen=True)
 class Book:
     title: str
     sections: tuple[Section, ...]
+    navigation: tuple[NavigationEntry, ...] = ()
 
 
 class TextExtractor(HTMLParser):
@@ -36,6 +47,12 @@ class TextExtractor(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
         self.hidden_depth = 0
+        self.raw_length = 0
+        self.anchors: dict[str, int | None] = {}
+
+    def append(self, text: str) -> None:
+        self.parts.append(text)
+        self.raw_length += len(text)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag.lower() in {"script", "style"}:
@@ -49,7 +66,13 @@ class TextExtractor(HTMLParser):
             "h2",
             "h3",
         }:
-            self.parts.append("\n")
+            self.append("\n")
+        if not self.hidden_depth:
+            for key, value in attrs:
+                if key == "id" and value:
+                    self.anchors[value] = (
+                        self.raw_length if value not in self.anchors else None
+                    )
 
     def handle_endtag(self, tag: str) -> None:
         if tag.lower() in {"script", "style"} and self.hidden_depth:
@@ -62,11 +85,42 @@ class TextExtractor(HTMLParser):
             "h2",
             "h3",
         }:
-            self.parts.append("\n")
+            self.append("\n")
 
     def handle_data(self, data: str) -> None:
         if not self.hidden_depth:
-            self.parts.append(data)
+            self.append(data)
+
+    def extract(self) -> tuple[str, dict[str, int | None]]:
+        """Normalize text and map element IDs to code-point offsets in that text."""
+        raw = "".join(self.parts)
+        pending = sorted(
+            (offset, name)
+            for name, offset in self.anchors.items()
+            if offset is not None
+        )
+        anchors: dict[str, int | None] = dict.fromkeys(self.anchors)
+        lines: list[str] = []
+        raw_position = 0
+        output_position = 0
+        anchor_index = 0
+        for line in raw.splitlines(keepends=True):
+            trimmed = line.strip()
+            if trimmed:
+                text_start = raw_position + len(line) - len(line.lstrip())
+                text_end = text_start + len(trimmed)
+                if lines:
+                    output_position += 1
+                while (
+                    anchor_index < len(pending) and pending[anchor_index][0] < text_end
+                ):
+                    raw_offset, name = pending[anchor_index]
+                    anchors[name] = output_position + max(0, raw_offset - text_start)
+                    anchor_index += 1
+                lines.append(trimmed)
+                output_position += len(trimmed)
+            raw_position += len(line)
+        return "\n".join(lines), anchors
 
 
 def _xml(archive: ZipFile, name: str):
@@ -81,6 +135,88 @@ def _resolve(base: str, href: str) -> str:
     if path.is_absolute() or ".." in path.parts or "\\" in str(path):
         raise InvalidEpub("Unsafe EPUB resource path.")
     return str(PurePosixPath(base).parent / path)
+
+
+def _navigation_target(base: str, href: str) -> tuple[str, str] | None:
+    url = urlsplit(href)
+    if url.scheme or url.netloc or url.query:
+        return None
+    path = unquote(url.path)
+    if path.startswith("/") or "\\" in path:
+        return None
+    resolved = normpath(join(dirname(base), path)) if path else base
+    if resolved == ".." or resolved.startswith("../"):
+        return None
+    return resolved, unquote(url.fragment)
+
+
+def _navigation(
+    archive: ZipFile, package_path: str, package, manifest, locations
+) -> tuple[NavigationEntry, ...]:
+    """Extract TOC links as suggestions, never as confirmed chapter boundaries."""
+    nav_item = next(
+        (
+            item
+            for item in manifest.values()
+            if "nav" in item.get("properties", "").split()
+        ),
+        None,
+    )
+    spine = package.find("./{*}spine")
+    ncx_item = manifest.get(spine.get("toc")) if spine is not None else None
+    source = nav_item if nav_item is not None else ncx_item
+    if source is None or not source.get("href"):
+        return ()
+    try:
+        nav_path = _resolve(package_path, source.attrib["href"])
+        root = _xml(archive, nav_path)
+        if nav_item is not None:
+            toc = next(
+                (
+                    node
+                    for node in root.iter()
+                    if node.tag.rsplit("}", 1)[-1] == "nav"
+                    and "toc"
+                    in node.get("{http://www.idpf.org/2007/ops}type", "").split()
+                ),
+                None,
+            )
+            links = (
+                []
+                if toc is None
+                else [
+                    ("".join(node.itertext()).strip(), node.get("href"))
+                    for node in toc.iter()
+                    if node.tag.rsplit("}", 1)[-1] == "a"
+                ]
+            )
+        else:
+            links = []
+            for point in root.findall(".//{*}navMap//{*}navPoint"):
+                label = point.find("./{*}navLabel/{*}text")
+                content = point.find("./{*}content")
+                links.append(
+                    (
+                        "".join(label.itertext()).strip() if label is not None else "",
+                        content.get("src") if content is not None else None,
+                    )
+                )
+        result = []
+        for title, href in links:
+            target = _navigation_target(nav_path, href) if href else None
+            position = None
+            offset = None
+            if target and target[0] in locations:
+                location = locations[target[0]]
+                if location is not None:
+                    position, anchors = location
+                    offset = anchors.get(target[1]) if target[1] else 0
+                    if offset is None:
+                        position = None
+            result.append(NavigationEntry(title, position, offset))
+        return tuple(result)
+    except (KeyError, ValueError, DefusedXmlException, ParseError, InvalidEpub):
+        return ()
 
 
 def read_epub(data: bytes) -> Book:
@@ -123,6 +259,7 @@ def read_epub(data: bytes) -> Book:
                 if item.get("id")
             }
             sections = []
+            locations = {}
             for ref in package.findall("./{*}spine/{*}itemref"):
                 if ref.get("linear", "yes") == "no":
                     continue
@@ -133,19 +270,27 @@ def read_epub(data: bytes) -> Book:
                     raise InvalidEpub(
                         "EPUB has unsupported content in its reading order."
                     )
-                content = archive.read(_resolve(package_path, item.attrib["href"]))
+                path = _resolve(package_path, item.attrib["href"])
+                content = archive.read(path)
                 parser = TextExtractor()
                 parser.feed(content.decode("utf-8-sig"))
-                text = "\n".join(
-                    line.strip()
-                    for line in "".join(parser.parts).splitlines()
-                    if line.strip()
-                )
+                text, anchors = parser.extract()
                 if text:
+                    if path in locations:
+                        locations[path] = None
+                    else:
+                        locations[path] = (len(sections), anchors)
                     sections.append(Section(text=text))
             if not sections:
                 raise InvalidEpub("EPUB has no readable text in its reading order.")
-            return Book(title=title or "Untitled book", sections=tuple(sections))
+            navigation = _navigation(
+                archive, package_path, package, manifest, locations
+            )
+            return Book(
+                title=title or "Untitled book",
+                sections=tuple(sections),
+                navigation=navigation,
+            )
     except InvalidEpub:
         raise
     except (
