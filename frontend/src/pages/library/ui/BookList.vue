@@ -2,7 +2,7 @@
 import type { Book } from "../api/libraryApi";
 
 defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string }>();
-defineEmits<{ retry: []; delete: [book: Book] }>();
+defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
 </script>
 
 <template>
@@ -22,18 +22,29 @@ defineEmits<{ retry: []; delete: [book: Book] }>();
           <h3>{{ book.title }}</h3>
           <p>
             {{ book.section_count }} {{ book.section_count === 1 ? "section" : "sections" }} ·
-            Chapter review not available yet
+            {{ book.chapters_confirmed ? "Chapters confirmed" : "Chapter review needed" }}
           </p>
         </div>
-        <button
-          class="delete"
-          type="button"
-          :disabled="busy"
-          :aria-label="`Delete ${book.title}`"
-          @click="$emit('delete', book)"
-        >
-          Delete
-        </button>
+        <div class="actions">
+          <button
+            class="review"
+            type="button"
+            :disabled="busy"
+            :aria-label="`Review chapters for ${book.title}`"
+            @click="$emit('review', book)"
+          >
+            Review chapters
+          </button>
+          <button
+            class="delete"
+            type="button"
+            :disabled="busy"
+            :aria-label="`Delete ${book.title}`"
+            @click="$emit('delete', book)"
+          >
+            Delete
+          </button>
+        </div>
       </li>
     </ul>
   </section>
@@ -94,6 +105,20 @@ h2 {
 .delete:hover {
   background: #eee;
 }
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.review {
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  min-height: 44px;
+  padding: 10px;
+  white-space: nowrap;
+}
 .book-list {
   padding: 0;
   margin: 0;
@@ -122,6 +147,15 @@ h3 {
   .section-heading,
   .book-row {
     padding-inline: 16px;
+  }
+  .book-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .actions {
+    justify-content: flex-start;
+    margin-left: -10px;
   }
 }
 </style>

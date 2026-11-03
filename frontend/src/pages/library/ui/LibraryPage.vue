@@ -3,6 +3,7 @@ import { useLibrary } from "../model/useLibrary";
 import AddBookButton from "./AddBookButton.vue";
 import BookList from "./BookList.vue";
 
+defineEmits<{ review: [book: { id: string; title: string }] }>();
 const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = useLibrary();
 </script>
 
@@ -25,6 +26,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
       :error="error"
       @retry="loadBooks"
       @delete="removeBook"
+      @review="$emit('review', $event)"
     />
     <p class="footnote">Chapter selection, recaps, and questions are coming in later tasks.</p>
   </main>

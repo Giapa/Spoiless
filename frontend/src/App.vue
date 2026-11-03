@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import LibraryPage from "./pages/library/ui/LibraryPage.vue";
+import ChapterReviewPage from "./pages/chapter-review/ui/ChapterReviewPage.vue";
+import { ref } from "vue";
+
+const selectedBook = ref<{ id: string; title: string } | null>(null);
 </script>
 
 <template>
@@ -8,7 +12,8 @@ import LibraryPage from "./pages/library/ui/LibraryPage.vue";
       <span class="mark" aria-hidden="true">S</span><span>Spoiless</span>
     </div>
   </header>
-  <LibraryPage />
+  <LibraryPage v-if="!selectedBook" @review="selectedBook = $event" />
+  <ChapterReviewPage v-else :book="selectedBook" @back="selectedBook = null" />
 </template>
 
 <style>
