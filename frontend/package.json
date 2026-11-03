@@ -1,0 +1,25 @@
+{
+  "name": "spoiless-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "lint": "oxlint src vite.config.ts",
+    "format": "oxfmt src vite.config.ts",
+    "format:check": "oxfmt --check src vite.config.ts"
+  },
+  "dependencies": {
+    "vue": "^3.5.44",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.5",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.90.0",
+    "typescript": "5.9.3",
+    "vite": "^7.3.7",
+    "vue-tsc": "3.2.5"
+  }
+}
