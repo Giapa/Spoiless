@@ -14,7 +14,7 @@ Before enabling this flow:
 
 Each issued client ID has a separate keyring item. A single item contains its token set, and it cannot overwrite a previously stored registration with a different verified subject. Identity-only sign-ins can be stored without granting plan usage. Stored credential fields are omitted from the record's normal representation; callers must still avoid logging the serialized record.
 
-The exchange deliberately disables HTTP redirects and environment-configured proxies to keep authorization codes directed to the documented OpenAI endpoint. This may need revisiting for deployments that require an explicit trusted proxy. Inference is not implemented; do not treat this module as a complete sign-in.
+The exchange deliberately disables HTTP redirects and environment-configured proxies to keep authorization codes directed to the documented OpenAI endpoint. This may need revisiting for deployments that require an explicit trusted proxy. A backend-only inference adapter exists; it is not connected to book questions or the app UI.
 
 The listener's status and account result are backend-only. Avoid logging authorization URLs or callback query strings, ensure a single controlled attempt, and never expose token records to the browser. The project owner reports successful real-account sign-in.
 
@@ -33,3 +33,5 @@ The local sign-out API attempts remote revocation using OpenAI discovery, retrie
 The library provides account selection, browser sign-in, cancellation and sign-out. Its first-use plan notice is remembered in browser storage for each local account registration; this marker contains no tokens. Browser tests use simulated responses. The project owner reports signing in and out manually; model access and inference remain unverified.
 
 The backend can request a selected account’s model catalog using its plan-authorized token, refreshing it if needed. It returns only visible model slugs and names in provider order; it has no model picker or inference yet. Catalog tests use simulated OpenAI responses, and live discovery is unverified.
+
+The backend-only inference adapter checks the selected account’s model catalog, then uses the official OpenAI Python SDK to stream a Responses API request with storage disabled. It returns text only after a completed response and reports failures without returning partial text. It is tested with simulated OpenAI responses; no live inference has been verified. It does not enforce book boundaries or validate citations and must not be used as a book-answer endpoint until those protections are in place.
