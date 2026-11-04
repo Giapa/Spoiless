@@ -499,3 +499,59 @@ def answer_book(
         answer=result.answer,
         citations=[AnswerCitation(**vars(item)) for item in result.citations],
     )
+
+
+class ModelListAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: bool = Field(strict=True)
+
+
+class ChatGPTModel(BaseModel):
+    slug: str
+    display_name: str
+
+
+@app.post("/api/chatgpt/models", response_model=list[ChatGPTModel])
+def chatgpt_models(
+    request: Request, response: Response, action: ModelListAction
+) -> list[ChatGPTModel]:
+    from spoiless.chatgpt_accounts import active_account
+    from spoiless.chatgpt_exchange import ExchangeError
+    from spoiless.chatgpt_models import ModelCatalogError, list_available_models
+
+    _local_request(request, mutation=True)
+    if not action.confirm:
+        raise HTTPException(422, "Confirmation is required.")
+    # ponytail: any database write invalidates lookup; narrow per account if needed.
+    with library.connect() as observer:
+        version = observer.execute("PRAGMA data_version").fetchone()[0]
+        account = active_account()
+        if account is None:
+            raise HTTPException(409, "Connect a ChatGPT account first.")
+        try:
+            models = list_available_models(account.id)
+        except ExchangeError:
+            raise HTTPException(
+                503, "Could not refresh the ChatGPT connection. Please retry."
+            ) from None
+        except SignInBusy:
+            raise HTTPException(409, "ChatGPT account is busy. Please retry.") from None
+        except ModelCatalogError:
+            raise HTTPException(
+                503, "Could not load ChatGPT models. Please retry."
+            ) from None
+        except AccountError:
+            raise HTTPException(409, "This account needs to sign in again.") from None
+        except (CredentialStoreError, SignInStartError):
+            raise HTTPException(
+                503, "The ChatGPT credential store is unavailable."
+            ) from None
+        current = active_account()
+        if (
+            current is None
+            or current.id != account.id
+            or observer.execute("PRAGMA data_version").fetchone()[0] != version
+        ):
+            raise HTTPException(409, "The active account changed. Please retry.")
+        response.headers["Cache-Control"] = "no-store"
+        return [ChatGPTModel(**model) for model in models]
