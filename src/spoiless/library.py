@@ -45,6 +45,10 @@ def connect():
                 FOREIGN KEY (book_id, section_position)
                     REFERENCES sections(book_id, position) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS reading_progress (
+                book_id TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+                current_chapter INTEGER NOT NULL CHECK (current_chapter >= 2)
+            );
             CREATE TABLE IF NOT EXISTS navigation_entries (
                 book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
                 position INTEGER NOT NULL,
@@ -188,6 +192,8 @@ def confirm_reading_units(book_id: str, units: list[ReadingUnitStart]) -> None:
                     "Reading unit starts must be valid and strictly ordered."
                 )
             previous = point
+        # Changing the chapter map invalidates the old progress boundary.
+        db.execute("DELETE FROM reading_progress WHERE book_id = ?", (book_id,))
         db.execute("DELETE FROM reading_units WHERE book_id = ?", (book_id,))
         db.executemany(
             """INSERT INTO reading_units
@@ -219,3 +225,83 @@ def get_reading_units(book_id: str) -> list[ReadingUnitStart]:
             (book_id,),
         ).fetchall()
     return [ReadingUnitStart(*row) for row in rows]
+
+
+@dataclass(frozen=True)
+class ReadingProgress:
+    chapter_count: int
+    current_chapter: int | None
+
+
+def _progress(db: sqlite3.Connection, book_id: str) -> ReadingProgress:
+    row = db.execute(
+        """SELECT (SELECT COUNT(*) FROM reading_units
+                   WHERE book_id = books.id AND kind = 'chapter'),
+                  (SELECT current_chapter FROM reading_progress
+                   WHERE book_id = books.id)
+           FROM books WHERE id = ?""",
+        (book_id,),
+    ).fetchone()
+    if row is None:
+        raise BookNotFound("Book not found.")
+    return ReadingProgress(*row)
+
+
+def get_progress(book_id: str) -> ReadingProgress:
+    with connect() as db:
+        return _progress(db, book_id)
+
+
+def set_progress(book_id: str, current_chapter: int) -> ReadingProgress:
+    with connect() as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        progress = _progress(db, book_id)
+        if (
+            type(current_chapter) is not int
+            or not 2 <= current_chapter <= progress.chapter_count + 1
+        ):
+            raise ValueError("Confirm chapters and choose a valid current chapter.")
+        db.execute(
+            """INSERT INTO reading_progress (book_id, current_chapter) VALUES (?, ?)
+               ON CONFLICT(book_id) DO UPDATE
+               SET current_chapter = excluded.current_chapter""",
+            (book_id, current_chapter),
+        )
+        return ReadingProgress(progress.chapter_count, current_chapter)
+
+
+def eligible_text(book_id: str) -> list[tuple[int, str]]:
+    """Only confirmed text before the current chapter; finished includes all text.
+
+    Must be used before retrieval or model context is assembled. Reads the boundary
+    and text in one transaction so a chapter-map update cannot mix revisions.
+    """
+    with connect() as db:
+        db.execute("BEGIN")
+        progress = _progress(db, book_id)
+        if (
+            progress.current_chapter is None
+            or not 2 <= progress.current_chapter <= progress.chapter_count + 1
+        ):
+            raise ValueError("Confirm chapters and select reading progress first.")
+        boundary = db.execute(
+            """SELECT section_position, character_offset FROM reading_units
+               WHERE book_id = ? AND kind = 'chapter'
+               ORDER BY position LIMIT 1 OFFSET ?""",
+            (book_id, progress.current_chapter - 1),
+        ).fetchone()
+        if boundary is None:
+            return db.execute(
+                "SELECT position, text FROM sections "
+                "WHERE book_id = ? ORDER BY position",
+                (book_id,),
+            ).fetchall()
+        section, offset = boundary
+        return db.execute(
+            """SELECT position,
+                      CASE WHEN position = ? THEN substr(text, 1, ?) ELSE text END
+               FROM sections WHERE book_id = ?
+               AND (position < ? OR (position = ? AND ? > 0))
+               ORDER BY position""",
+            (section, offset, book_id, section, section, offset),
+        ).fetchall()

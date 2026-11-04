@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Book } from "../api/libraryApi";
+import ReadingProgress from "./ReadingProgress.vue";
 
 defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string }>();
 defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
@@ -24,6 +25,7 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
             {{ book.section_count }} {{ book.section_count === 1 ? "section" : "sections" }} ·
             {{ book.chapters_confirmed ? "Chapters confirmed" : "Chapter review needed" }}
           </p>
+          <ReadingProgress v-if="book.chapters_confirmed" :book-id="book.id" />
         </div>
         <div class="actions">
           <button

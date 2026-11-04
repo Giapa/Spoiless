@@ -135,3 +135,32 @@ def confirm_units(book_id: str, request: ReadingUnitsRequest) -> Response:
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
     return Response(status_code=204)
+
+
+class ProgressResponse(BaseModel):
+    chapter_count: int
+    current_chapter: int | None
+
+
+class ProgressRequest(BaseModel):
+    current_chapter: int = Field(ge=2, strict=True)
+
+
+@app.get("/api/books/{book_id}/progress", response_model=ProgressResponse)
+def reading_progress(book_id: str) -> ProgressResponse:
+    try:
+        return ProgressResponse(**vars(library.get_progress(book_id)))
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.put("/api/books/{book_id}/progress", response_model=ProgressResponse)
+def update_progress(book_id: str, request: ProgressRequest) -> ProgressResponse:
+    try:
+        return ProgressResponse(
+            **vars(library.set_progress(book_id, request.current_chapter))
+        )
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc

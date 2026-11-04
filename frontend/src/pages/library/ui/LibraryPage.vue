@@ -28,7 +28,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
       @delete="removeBook"
       @review="$emit('review', $event)"
     />
-    <p class="footnote">Chapter selection, recaps, and questions are coming in later tasks.</p>
+    <p class="footnote">Recaps and questions are coming in later tasks.</p>
   </main>
 </template>
 
