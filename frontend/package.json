@@ -9,7 +9,8 @@
     "lint": "oxlint src vite.config.ts",
     "format": "oxfmt src vite.config.ts",
     "format:check": "oxfmt --check src vite.config.ts",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:browser": "node --test tests/*.browser.mjs"
   },
   "dependencies": {
     "vue": "^3.5.44",
@@ -19,6 +20,7 @@
     "@vitejs/plugin-vue": "6.0.5",
     "oxfmt": "^0.76.0",
     "oxlint": "^1.90.0",
+    "playwright": "^1.64.0",
     "typescript": "5.9.3",
     "vite": "^7.3.7",
     "vue-tsc": "3.2.5"

@@ -2,7 +2,7 @@
 
 A local-first reading companion in development. Spoiless is intended to answer questions about books using only chapters the reader has completed.
 
-You can import and delete EPUBs in a local library. Readers can confirm chapters and record their progress. Sign-in and AI answers are not implemented yet. The EPUB importer is conservative and may reject some valid files, including those with encryption metadata. See [TASKS.md](TASKS.md) for the reviewable roadmap and [HANDOFF.md](HANDOFF.md) for the agreed product scope.
+You can import and delete EPUBs in a local library. Readers can confirm chapters and record their progress. ChatGPT sign-in is available for testing; AI answers are not implemented yet. The EPUB importer is conservative and may reject some valid files, including those with encryption metadata. See [TASKS.md](TASKS.md) for the reviewable roadmap and [HANDOFF.md](HANDOFF.md) for the agreed product scope.
 
 The library is stored in `$XDG_DATA_HOME/spoiless/library.sqlite3`, or `~/.local/share/spoiless/library.sqlite3` if `XDG_DATA_HOME` is unset.
 
@@ -33,7 +33,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL shown by Vite. Run `npm run build` to check types and create a production build, `npm run lint` for Oxlint, and `npm run format:check` for Oxfmt.
+Open the local URL shown by Vite. Run `npm run build` to check types and create a production build, `npm run lint` for Oxlint, and `npm run format:check` for Oxfmt. For browser tests, install Chromium once with `npx playwright install chromium`, then run `npm run test:browser`.
 
 The frontend follows Feature-Sliced Design. `src/App.vue` provides the app shell; `src/pages/library` groups the library page's `ui`, `model`, and `api` code. Import the needed file directly; slices may only depend on lower layers. Add layers and slices when the application needs them.
 
@@ -53,4 +53,4 @@ The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story t
 
 ## ChatGPT connection
 
-The sign-in request, local callback listener, token exchange and identity verification are tested offline with a simulated server. Linux secure credential storage has passed a temporary save/read/delete check on the development machine, and a local registry can remember and reauthorize verified account registrations through backend controls. Backend token refresh is covered by offline tests. The sign-in interface and real-account verification are not yet available. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.
+The sign-in request, local callback listener, token exchange and identity verification are tested offline with a simulated server. Linux secure credential storage has passed a temporary save/read/delete check on the development machine, and a local registry can remember and reauthorize verified account registrations through backend controls. Backend token refresh is covered by offline tests. The library includes a sign-in interface, but real-account verification has not yet been performed. To try it on Linux, start both servers above, unlock your system keyring, and choose **Continue with ChatGPT** in the library. Complete the approval in the browser that opens, then return to Spoiless. Availability depends on your account and OpenAI’s preview eligibility; a successful sign-in does not yet enable AI answers. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.
