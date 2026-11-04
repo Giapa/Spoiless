@@ -10,6 +10,9 @@ import time
 from dataclasses import dataclass
 from threading import Lock, Thread
 from typing import Literal
+from urllib.parse import urlsplit
+
+import httpx
 
 try:
     import fcntl
@@ -19,10 +22,16 @@ except ImportError:  # The rest of the app can still run on unverified platforms
 from spoiless.chatgpt_accounts import (
     AccountError,
     active_account,
+    clear_active_account,
     get_account,
     select_saved_account,
 )
-from spoiless.chatgpt_auth import RESOURCE, VerifiedIdentity, has_plan_permission
+from spoiless.chatgpt_auth import (
+    ISSUER,
+    RESOURCE,
+    VerifiedIdentity,
+    has_plan_permission,
+)
 from spoiless.chatgpt_credentials import (
     CredentialStoreError,
     check_credential_store,
@@ -185,6 +194,70 @@ class SignInManager:
             finally:
                 os.close(fd)
             self._session = None
+
+    def sign_out(self) -> bool:
+        """Revoke and remove the selected account's credentials."""
+        with self._lock:
+            if self._session is not None and self._session.status in {
+                "pending",
+                "processing",
+            }:
+                raise SignInBusy("A sign-in is already active.")
+            fd = _acquire_attempt_lock()
+            try:
+                account = active_account()
+                if account is None:
+                    raise AccountError("No active account.")
+                record = load_credentials(account.client_id)
+                if record is not None and record.subject != account.subject:
+                    raise AccountError("This account needs to sign in again.")
+                confirmed = False
+                if record is not None and record.refresh_token:
+                    for attempt in range(3):
+                        retry = False
+                        try:
+                            with _client() as client:
+                                discovery = _json_request(
+                                    client,
+                                    "GET",
+                                    f"{ISSUER}/.well-known/openid-configuration",
+                                )
+                                endpoint = discovery.get("revocation_endpoint")
+                                if not isinstance(endpoint, str):
+                                    raise ValueError("Invalid endpoint")
+                                parsed = urlsplit(endpoint)
+                                if (
+                                    parsed.scheme != "https"
+                                    or parsed.netloc != "auth.openai.com"
+                                    or parsed.query
+                                    or parsed.fragment
+                                    or not parsed.path.startswith("/")
+                                ):
+                                    raise ValueError("Invalid endpoint")
+                                with client.stream(
+                                    "POST",
+                                    endpoint,
+                                    data={
+                                        "token": record.refresh_token,
+                                        "token_type_hint": "refresh_token",
+                                        "client_id": record.client_id,
+                                    },
+                                ) as response:
+                                    confirmed = response.status_code == 200
+                                    retry = response.status_code >= 500
+                        except (httpx.HTTPError, ExchangeError):
+                            retry = True
+                        except ValueError:
+                            break
+                        if confirmed or not retry or attempt == 2:
+                            break
+                        time.sleep(0.2 * 2**attempt)
+                delete_credentials(account.client_id)
+                clear_active_account()
+                self._session = None
+                return confirmed
+            finally:
+                os.close(fd)
 
 
 def get_valid_access_token(account_id: str) -> str:

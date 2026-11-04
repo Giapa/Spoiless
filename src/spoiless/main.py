@@ -384,3 +384,25 @@ def select_chatgpt_account(
         raise HTTPException(503, str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return SignInResponse(**vars(_sign_in.state()))
+
+
+class SignOutAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confirm: bool = Field(strict=True)
+
+
+@app.post("/api/chatgpt/sign-out")
+def sign_out_chatgpt(
+    request: Request, response: Response, action: SignOutAction
+) -> dict:
+    _local_request(request, mutation=True)
+    if not action.confirm:
+        raise HTTPException(422, "Confirmation is required.")
+    try:
+        confirmed = _sign_in.sign_out()
+    except (SignInBusy, AccountError) as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (CredentialStoreError, SignInStartError) as exc:
+        raise HTTPException(503, str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return {"revocation_confirmed": confirmed}

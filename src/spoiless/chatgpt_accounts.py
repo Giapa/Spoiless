@@ -118,3 +118,9 @@ def select_saved_account(account_id: str) -> None:
     if record is None or record.subject != account.subject:
         raise AccountError("This account needs to sign in again.")
     _mark_active(account_id)
+
+
+def clear_active_account() -> None:
+    """Forget the active selection while retaining saved registrations."""
+    with connect() as db, db:
+        db.execute("DELETE FROM app_settings WHERE key = 'active_chatgpt_account'")
