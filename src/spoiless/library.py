@@ -49,6 +49,17 @@ def connect():
                 book_id TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
                 current_chapter INTEGER NOT NULL CHECK (current_chapter >= 2)
             );
+            CREATE TABLE IF NOT EXISTS passage_embeddings (
+                book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                section_position INTEGER NOT NULL,
+                character_offset INTEGER NOT NULL,
+                content_hash TEXT NOT NULL,
+                model_revision TEXT NOT NULL,
+                vector TEXT NOT NULL,
+                PRIMARY KEY (book_id, section_position, character_offset),
+                FOREIGN KEY (book_id, section_position)
+                    REFERENCES sections(book_id, position) ON DELETE CASCADE
+            );
             CREATE TABLE IF NOT EXISTS navigation_entries (
                 book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
                 position INTEGER NOT NULL,

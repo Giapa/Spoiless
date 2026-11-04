@@ -1,7 +1,10 @@
 """Explicit setup of the local semantic-search model."""
 
+import os
+import tempfile
 from pathlib import Path
 from threading import Lock
+from uuid import uuid4
 
 from spoiless.library import database_path
 
@@ -28,7 +31,14 @@ def setup_model() -> None:
         marker = directory / "minilm-ready"
         marker.unlink(missing_ok=True)
         TextEmbedding(MODEL_NAME, cache_dir=str(directory), threads=2)
-        marker.touch(mode=0o600)
+        # Replace atomically only after the model loads successfully.
+        fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".model-ready-")
+        try:
+            with os.fdopen(fd, "w") as file:
+                file.write(str(uuid4()))
+            os.replace(temp_path, marker)
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
 
 
 def load_model():
@@ -40,3 +50,12 @@ def load_model():
     return TextEmbedding(
         MODEL_NAME, cache_dir=str(model_dir()), threads=2, local_files_only=True
     )
+
+
+def model_revision() -> str:
+    """Change cache identity after each completed setup; support old markers."""
+    try:
+        marker = (model_dir() / "minilm-ready").read_text().strip()
+    except FileNotFoundError:
+        return f"{MODEL_NAME}:missing"
+    return f"{MODEL_NAME}:{marker or 'legacy'}"
