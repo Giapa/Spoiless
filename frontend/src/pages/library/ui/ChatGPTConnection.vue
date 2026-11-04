@@ -2,6 +2,8 @@
 import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import { z } from "zod";
 
+const emit = defineEmits<{ accountChanging: [] }>();
+
 const stateSchema = z.object({
   status: z.enum([
     "idle",
@@ -98,6 +100,7 @@ async function load() {
   }
 }
 async function act(path: string) {
+  if (path === "/api/chatgpt/sign-in") emit("accountChanging");
   generation++;
   busy.value = true;
   clearTimeout(timer);
@@ -116,6 +119,7 @@ async function act(path: string) {
   }
 }
 async function signOut() {
+  emit("accountChanging");
   generation++;
   busy.value = true;
   clearTimeout(timer);

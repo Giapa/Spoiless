@@ -10,7 +10,8 @@
     "format": "oxfmt src vite.config.ts",
     "format:check": "oxfmt --check src vite.config.ts",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "test:browser": "node --test tests/*.browser.mjs"
+    "test:browser": "node --test tests/*.browser.mjs",
+    "test:integration": "npm run build && node --test tests/*.integration.mjs"
   },
   "dependencies": {
     "vue": "^3.5.44",
