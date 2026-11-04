@@ -406,3 +406,96 @@ def sign_out_chatgpt(
         raise HTTPException(503, str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return {"revocation_confirmed": confirmed}
+
+
+class AnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=1, max_length=500, strict=True)
+    model: str = Field(min_length=1, max_length=256, strict=True)
+    confirm: bool = Field(strict=True)
+
+
+class AnswerCitation(BaseModel):
+    section_position: int
+    character_offset: int
+    quote: str
+
+
+class AnswerResponse(BaseModel):
+    answer: str
+    citations: list[AnswerCitation]
+
+
+@app.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
+def answer_book(
+    book_id: str, request: Request, response: Response, action: AnswerRequest
+) -> AnswerResponse:
+    from spoiless.book_answers import answer_book_question
+    from spoiless.chatgpt_accounts import active_account
+    from spoiless.chatgpt_exchange import ExchangeError
+    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt_models import ModelCatalogError
+    from spoiless.citations import CitationValidationError
+    from spoiless.retrieval import ProgressChanged
+
+    _local_request(request, mutation=True)
+    if not action.confirm:
+        raise HTTPException(422, "Confirmation is required.")
+    account = active_account()
+    if account is None:
+        raise HTTPException(409, "Connect a ChatGPT account first.")
+    try:
+        result = answer_book_question(
+            book_id, account.id, action.model, action.question
+        )
+    except library.BookNotFound:
+        raise HTTPException(404, "Book not found.") from None
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from None
+    except CitationValidationError:
+        raise HTTPException(
+            502, "Could not verify the answer citations. Please retry."
+        ) from None
+    except ProgressChanged:
+        raise HTTPException(409, "Reading progress changed. Please retry.") from None
+    except AccountError:
+        raise HTTPException(409, "This account needs to sign in again.") from None
+    except (CredentialStoreError, SignInStartError):
+        raise HTTPException(
+            503, "The ChatGPT credential store is unavailable."
+        ) from None
+    except SignInBusy:
+        raise HTTPException(409, "ChatGPT account is busy. Please retry.") from None
+    except ExchangeError:
+        raise HTTPException(
+            503, "Could not refresh the ChatGPT connection. Please retry."
+        ) from None
+    except ModelCatalogError:
+        raise HTTPException(
+            503, "Could not load ChatGPT models. Please retry."
+        ) from None
+    except InferenceError as exc:
+        if exc.code == "subscription_sharing_usage_limit_exceeded":
+            raise HTTPException(
+                429,
+                {
+                    "code": exc.code,
+                    "message": "Review your usage limit in ChatGPT settings.",
+                },
+            ) from None
+        if exc.code == "subscription_sharing_usage_unavailable":
+            raise HTTPException(
+                503,
+                {
+                    "code": exc.code,
+                    "message": "ChatGPT usage is unavailable. Please retry.",
+                },
+            ) from None
+        raise HTTPException(
+            503, "Could not get a response from ChatGPT. Please retry."
+        ) from None
+    response.headers["Cache-Control"] = "no-store"
+    return AnswerResponse(
+        answer=result.answer,
+        citations=[AnswerCitation(**vars(item)) for item in result.citations],
+    )
