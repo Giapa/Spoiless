@@ -4,7 +4,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from spoiless import library
 from spoiless.chatgpt_accounts import AccountError, list_accounts
@@ -266,7 +266,12 @@ class SignInResponse(BaseModel):
 
 
 class SignInAction(BaseModel):
-    confirm: Literal[True]
+    model_config = ConfigDict(extra="forbid")
+
+    confirm: bool = Field(strict=True)
+    account_id: str | None = Field(
+        default=None, min_length=1, max_length=64, strict=True
+    )
 
 
 def _local_request(request: Request, *, mutation: bool = False) -> None:
@@ -312,9 +317,11 @@ def start_chatgpt_sign_in(
     request: Request, response: Response, action: SignInAction
 ) -> SignInResponse:
     _local_request(request, mutation=True)
+    if not action.confirm:
+        raise HTTPException(422, "Confirmation is required.")
     try:
-        _sign_in.start()
-    except SignInBusy as exc:
+        _sign_in.start(action.account_id)
+    except (SignInBusy, AccountError) as exc:
         raise HTTPException(409, str(exc)) from exc
     except (CredentialStoreError, SignInStartError) as exc:
         raise HTTPException(503, str(exc)) from exc
@@ -327,6 +334,8 @@ def cancel_chatgpt_sign_in(
     request: Request, response: Response, action: SignInAction
 ) -> SignInResponse:
     _local_request(request, mutation=True)
+    if not action.confirm:
+        raise HTTPException(422, "Confirmation is required.")
     try:
         _sign_in.cancel()
     except SignInBusy as exc:
@@ -342,8 +351,10 @@ class AccountResponse(BaseModel):
 
 
 class AccountSelection(BaseModel):
-    account_id: str = Field(min_length=1, max_length=64)
-    confirm: Literal[True]
+    model_config = ConfigDict(extra="forbid")
+
+    account_id: str = Field(min_length=1, max_length=64, strict=True)
+    confirm: bool = Field(strict=True)
 
 
 @app.get("/api/chatgpt/accounts", response_model=list[AccountResponse])
@@ -361,6 +372,8 @@ def select_chatgpt_account(
     request: Request, response: Response, selection: AccountSelection
 ) -> SignInResponse:
     _local_request(request, mutation=True)
+    if not selection.confirm:
+        raise HTTPException(422, "Confirmation is required.")
     try:
         _sign_in.select_account(selection.account_id)
     except SignInBusy as exc:

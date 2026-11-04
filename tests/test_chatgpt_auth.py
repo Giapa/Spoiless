@@ -145,3 +145,26 @@ def test_identity_requires_signature_and_all_bound_claims():
         invalid = jwt.encode({**claims, **update}, key, algorithm="RS256")
         with pytest.raises(InvalidAuthorization):
             verify_identity(invalid, "oaiapp_123", "expected-nonce", key.public_key())
+
+
+def test_returning_request_uses_saved_registration_and_private_hint(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    host = host_id()
+    previous = AuthorizationAttempt("http://127.0.0.1:1455/auth/callback")
+    attempt = AuthorizationAttempt(
+        "http://127.0.0.1:1455/auth/callback", returning_client_id="oaiapp_saved"
+    )
+    hint = "private.retained.id-token"
+    params = parse_qs(
+        urlsplit(attempt.authorization_url(host, id_token_hint=hint)).query
+    )
+    assert params["client_id"] == ["oaiapp_saved"]
+    assert params["id_token_hint"] == [hint]
+    assert "agent_name_hint" not in params
+    assert params["ext_agent_host_id"] == [host]
+    assert attempt.state != previous.state and attempt.nonce != previous.nonce
+    assert hint not in repr(attempt)
+    with pytest.raises(InvalidAuthorization):
+        previous.authorization_url(host, id_token_hint=hint)

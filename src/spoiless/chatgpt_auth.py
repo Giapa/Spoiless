@@ -86,8 +86,21 @@ class AuthorizationAttempt:
         ):
             raise InvalidAuthorization("Invalid registered client ID.")
 
-    def authorization_url(self, agent_host_id: str) -> str:
-        """Build the documented request; callers must not log this URL."""
+    def authorization_url(
+        self, agent_host_id: str, *, id_token_hint: str | None = None
+    ) -> str:
+        """Build the request; callers must never log the URL or its ID-token hint."""
+        if id_token_hint is not None and (
+            self.returning_client_id is None
+            or not isinstance(id_token_hint, str)
+            or not id_token_hint
+            or len(id_token_hint) > 65536
+            or not id_token_hint.isascii()
+            or not all(
+                char.isprintable() and not char.isspace() for char in id_token_hint
+            )
+        ):
+            raise InvalidAuthorization("Invalid sign-in hint.")
         try:
             from uuid import UUID
 
@@ -124,6 +137,8 @@ class AuthorizationAttempt:
         }
         if self.returning_client_id is None:
             params["agent_name_hint"] = "Spoiless"
+        elif id_token_hint is not None:
+            params["id_token_hint"] = id_token_hint
         with self._lock:
             if self._used or time.monotonic() - self.created > ATTEMPT_SECONDS:
                 raise InvalidAuthorization(

@@ -211,3 +211,48 @@ def test_listener_and_exchange_work_together_without_real_account(
         assert secret not in response.text
         assert secret not in captured.err
         assert secret not in captured.out
+
+
+def test_returning_listener_passes_selected_identity_without_logging_hint(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    opened = []
+    monkeypatch.setattr(
+        listener.webbrowser, "open", lambda url: opened.append(url) or True
+    )
+    seen = []
+
+    def exchange(attempt, query, *, expected_subject):
+        code, client_id = attempt.accept_callback(query)
+        seen.append((code, client_id, expected_subject))
+        return ConnectedAccount(
+            client_id, VerifiedIdentity(expected_subject, None), True
+        )
+
+    monkeypatch.setattr(listener, "exchange_and_store", exchange)
+    session = listener.LocalSignIn(
+        returning_client_id="oaiapp_saved",
+        expected_subject="reader-identity",
+        id_token_hint="private.jwt.hint",
+    )
+    try:
+        session.open_browser()
+        params = parse_qs(urlsplit(opened[0]).query)
+        assert params["client_id"] == ["oaiapp_saved"]
+        assert params["id_token_hint"] == ["private.jwt.hint"]
+        assert "agent_name_hint" not in params
+        query = urlencode({"state": session._attempt.state, "code": "private-code"})
+        with httpx.Client(trust_env=False) as client:
+            response = client.get(url_for(session, query))
+        assert response.status_code == 200
+        assert seen == [("private-code", "oaiapp_saved", "reader-identity")]
+        assert session.wait(3) and session.status == "connected"
+        assert "private.jwt.hint" not in response.text
+        assert "private.jwt.hint" not in repr(session)
+        captured = capsys.readouterr()
+        assert "private.jwt.hint" not in captured.out + captured.err
+        assert "private-code" not in captured.out + captured.err
+    finally:
+        session.close()
+        assert session.wait(3)

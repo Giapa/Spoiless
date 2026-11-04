@@ -355,3 +355,40 @@ def test_existing_keyring_identity_mismatch_is_not_registered(fixture, monkeypat
     with pytest.raises(CredentialStoreError):
         exchange.exchange_and_store(attempt, callback(attempt))
     assert not saved and not accounts.list_accounts()
+
+
+def test_returning_exchange_keeps_registered_account_and_subject(fixture, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt_auth import VerifiedIdentity
+
+    key, _, claims, jwk, body, saved = fixture
+    saved_id = accounts.remember_verified(
+        "oaiapp_123", VerifiedIdentity("reader-subject", "reader@example.test")
+    )
+    attempt = AuthorizationAttempt(
+        "http://127.0.0.1:1455/auth/callback", returning_client_id="oaiapp_123"
+    )
+    body["id_token"] = jwt.encode(
+        {**claims, "nonce": attempt.nonce},
+        key,
+        algorithm="RS256",
+        headers={"kid": "test-key"},
+    )
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        if request.method == "POST":
+            assert parse_qs(request.content.decode())["client_id"] == ["oaiapp_123"]
+            return httpx.Response(200, json=body)
+        return httpx.Response(200, json={"keys": [jwk]})
+
+    wire(monkeypatch, handler)
+    query = urlencode({"state": attempt.state, "code": "private-code"})
+    result = exchange.exchange_and_store(
+        attempt, query, expected_subject="reader-subject"
+    )
+    assert result.client_id == "oaiapp_123"
+    assert accounts.active_account().id == saved_id
+    assert len(accounts.list_accounts()) == 1 and len(saved) == 1
+    assert len(requests) == 2

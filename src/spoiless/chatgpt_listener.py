@@ -40,7 +40,22 @@ class _LoopbackServer(HTTPServer):
 class LocalSignIn:
     """Own one loopback callback listener and one server-side authorization attempt."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        returning_client_id: str | None = None,
+        expected_subject: str | None = None,
+        id_token_hint: str | None = None,
+    ) -> None:
+        if (returning_client_id is None) != (expected_subject is None) or (
+            id_token_hint is not None and returning_client_id is None
+        ):
+            raise ValueError("Invalid returning account.")
+        if expected_subject is not None and (
+            not isinstance(expected_subject, str) or not expected_subject.strip()
+        ):
+            raise ValueError("Invalid returning account.")
+        self._expected_subject = expected_subject
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._closed = threading.Event()
@@ -62,9 +77,12 @@ class LocalSignIn:
         self._port = self._server.server_address[1]
         try:
             self._attempt = AuthorizationAttempt(
-                f"http://127.0.0.1:{self._port}/auth/callback"
+                f"http://127.0.0.1:{self._port}/auth/callback",
+                returning_client_id=returning_client_id,
             )
-            self._url = self._attempt.authorization_url(host_id())
+            self._url = self._attempt.authorization_url(
+                host_id(), id_token_hint=id_token_hint
+            )
             self._deadline = self._attempt.created + ATTEMPT_SECONDS
             self._thread = threading.Thread(target=self._serve, daemon=True)
             self._thread.start()
@@ -170,7 +188,12 @@ class LocalSignIn:
                 return
             self._status = "processing"
         try:
-            account = exchange_and_store(self._attempt, parts.query)
+            if self._expected_subject is None:
+                account = exchange_and_store(self._attempt, parts.query)
+            else:
+                account = exchange_and_store(
+                    self._attempt, parts.query, expected_subject=self._expected_subject
+                )
         except AuthorizationDenied:
             with self._lock:
                 self._status = "denied"

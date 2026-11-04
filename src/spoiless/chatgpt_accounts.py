@@ -74,6 +74,13 @@ def list_accounts() -> list[SavedAccount]:
     ]
 
 
+def get_account(account_id: str) -> SavedAccount:
+    account = next((item for item in list_accounts() if item.id == account_id), None)
+    if account is None:
+        raise AccountError("Saved account not found.")
+    return account
+
+
 def active_account() -> SavedAccount | None:
     return next((account for account in list_accounts() if account.active), None)
 
@@ -106,9 +113,7 @@ def select_saved_account(account_id: str) -> None:
 
     This selects a saved account, not a guarantee that its tokens remain valid.
     """
-    account = next((item for item in list_accounts() if item.id == account_id), None)
-    if account is None:
-        raise AccountError("Saved account not found.")
+    account = get_account(account_id)
     record = load_credentials(account.client_id)
     if record is None or record.subject != account.subject:
         raise AccountError("This account needs to sign in again.")

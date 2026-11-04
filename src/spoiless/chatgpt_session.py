@@ -15,8 +15,17 @@ try:
 except ImportError:  # The rest of the app can still run on unverified platforms.
     fcntl = None
 
-from spoiless.chatgpt_accounts import active_account, select_saved_account
-from spoiless.chatgpt_credentials import CredentialStoreError, check_credential_store
+from spoiless.chatgpt_accounts import (
+    AccountError,
+    active_account,
+    get_account,
+    select_saved_account,
+)
+from spoiless.chatgpt_credentials import (
+    CredentialStoreError,
+    check_credential_store,
+    load_credentials,
+)
 from spoiless.chatgpt_listener import LocalSignIn, Status
 from spoiless.library import database_path
 
@@ -90,20 +99,30 @@ class SignInManager:
                 )
             return SignInState(status)
 
-    def start(self) -> None:
+    def start(self, account_id: str | None = None) -> None:
         with self._lock:
             if self._session is not None and self._session.status in {
                 "pending",
                 "processing",
-                "connected",
             }:
                 raise SignInBusy("A sign-in is already active.")
             # Hold the OS lock until the listener closes, including during exchange.
             fd = _acquire_attempt_lock()
             try:
                 check_credential_store()
-                session = LocalSignIn()
-            except CredentialStoreError:
+                if account_id is None:
+                    session = LocalSignIn()
+                else:
+                    account = get_account(account_id)
+                    record = load_credentials(account.client_id)
+                    if record is not None and record.subject != account.subject:
+                        raise AccountError("The saved account identity does not match.")
+                    session = LocalSignIn(
+                        returning_client_id=account.client_id,
+                        expected_subject=account.subject,
+                        id_token_hint=record.id_token if record is not None else None,
+                    )
+            except (CredentialStoreError, AccountError):
                 os.close(fd)
                 raise
             except Exception:

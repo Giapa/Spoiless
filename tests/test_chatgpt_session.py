@@ -14,7 +14,8 @@ from spoiless.chatgpt_exchange import ConnectedAccount
 
 
 class FakeSignIn:
-    def __init__(self):
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
         self.status = "pending"
         self.account = None
         self.closed = threading.Event()
@@ -47,8 +48,8 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(chatgpt_session, "check_credential_store", lambda: None)
     sessions = []
 
-    def make_session():
-        session = FakeSignIn()
+    def make_session(**kwargs):
+        session = FakeSignIn(**kwargs)
         sessions.append(session)
         return session
 
@@ -96,12 +97,6 @@ def test_single_attempt_state_and_no_credentials_in_response(setup):
         assert "private-subject" not in connected.text
         assert "oaiapp_123" not in connected.text
         assert "token" not in connected.text
-        assert (
-            client.post(
-                "/api/chatgpt/sign-in", json={"confirm": True}, headers=headers
-            ).status_code
-            == 409
-        )
         assert (
             client.post(
                 "/api/chatgpt/sign-in/cancel", json={"confirm": True}, headers=headers
@@ -244,3 +239,137 @@ def test_lock_rejects_symlink_without_touching_target(setup, tmp_path):
         manager.start()
     assert target.read_text() == "preserve"
     assert not sessions
+
+
+def test_returning_signin_uses_only_selected_saved_identity(setup, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt_credentials import CredentialRecord
+
+    _, sessions = setup
+    identity = VerifiedIdentity("selected-subject", "same@example.test")
+    chosen = accounts.remember_verified("oaiapp_chosen", identity)
+    accounts.remember_verified(
+        "oaiapp_other", VerifiedIdentity("other-subject", identity.email)
+    )
+    record = CredentialRecord(
+        client_id="oaiapp_chosen",
+        subject=identity.subject,
+        email=identity.email,
+        id_token="private.jwt.hint",
+        scope="openid profile email",
+    )
+    monkeypatch.setattr(chatgpt_session, "load_credentials", lambda client_id: record)
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        main.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)
+    ) as client:
+        result = client.post(
+            "/api/chatgpt/sign-in",
+            json={"confirm": True, "account_id": chosen},
+            headers=headers,
+        )
+        assert result.status_code == 200 and result.json()["status"] == "pending"
+        assert sessions[0].kwargs == {
+            "returning_client_id": "oaiapp_chosen",
+            "expected_subject": "selected-subject",
+            "id_token_hint": "private.jwt.hint",
+        }
+        assert "private.jwt.hint" not in result.text
+        assert "selected-subject" not in result.text
+        assert "oaiapp_chosen" not in result.text
+
+
+def test_returning_signin_without_keyring_record_and_unknown_id(setup, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+
+    manager, sessions = setup
+    identity = VerifiedIdentity("reader", None)
+    account_id = accounts.remember_verified("oaiapp_saved", identity)
+    monkeypatch.setattr(chatgpt_session, "load_credentials", lambda client_id: None)
+    with pytest.raises(accounts.AccountError):
+        manager.start("missing")
+    assert not sessions
+    manager.start(account_id)
+    assert sessions[0].kwargs == {
+        "returning_client_id": "oaiapp_saved",
+        "expected_subject": "reader",
+        "id_token_hint": None,
+    }
+
+
+def test_mismatched_stored_identity_never_opens_browser(setup, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt_credentials import CredentialRecord
+
+    manager, sessions = setup
+    identity = VerifiedIdentity("expected", None)
+    account_id = accounts.remember_verified("oaiapp_saved", identity)
+    record = CredentialRecord(
+        client_id="oaiapp_saved",
+        subject="different",
+        email=None,
+        id_token="private.jwt.hint",
+        scope="openid",
+    )
+    monkeypatch.setattr(chatgpt_session, "load_credentials", lambda client_id: record)
+    with pytest.raises(accounts.AccountError):
+        manager.start(account_id)
+    assert not sessions
+    assert accounts.active_account() is None
+
+
+def test_corrupt_keyring_cannot_start_returning_signin(setup, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+
+    manager, sessions = setup
+    account_id = accounts.remember_verified(
+        "oaiapp_saved", VerifiedIdentity("reader", None)
+    )
+
+    def fail(client_id):
+        raise CredentialStoreError("Saved account is unavailable.")
+
+    monkeypatch.setattr(chatgpt_session, "load_credentials", fail)
+    with pytest.raises(CredentialStoreError):
+        manager.start(account_id)
+    assert not sessions
+    assert accounts.active_account() is None
+
+
+def test_untrusted_hint_or_non_boolean_confirmation_is_rejected(setup):
+    _, sessions = setup
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        main.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)
+    ) as client:
+        for payload in (
+            {"confirm": 1},
+            {"confirm": False},
+            {"confirm": True, "id_token_hint": "untrusted.jwt.hint"},
+            {"confirm": True, "returning_client_id": "oaiapp_untrusted"},
+        ):
+            assert (
+                client.post(
+                    "/api/chatgpt/sign-in", json=payload, headers=headers
+                ).status_code
+                == 422
+            )
+    assert not sessions
+
+
+def test_explicit_new_signin_can_follow_connected_attempt(setup):
+    manager, sessions = setup
+    manager.start()
+    sessions[0].complete()
+    assert manager.state().status == "connected"
+    deadline = time.monotonic() + 3
+    while True:
+        try:
+            manager.start()
+            break
+        except chatgpt_session.SignInBusy:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.05)
+    assert len(sessions) == 2 and sessions[1].opened
+    assert manager.state().status == "pending"
