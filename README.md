@@ -50,3 +50,7 @@ An offline keyword-search API builds a temporary index from eligible text only, 
 ## Sample and evaluation
 
 The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story that can be redistributed. Run `uv run python scripts/evaluate_retrieval.py` for offline keyword and boundary checks. Add `--hybrid` only after downloading the model in the app. See [the evaluation notes](docs/retrieval-evaluation.md) for results and limitations. EPUBs imported before the document-head fix may need to be deleted and reimported to remove metadata from their stored text.
+
+## ChatGPT connection
+
+The sign-in request and identity-verification groundwork is tested offline, but connecting an account is not yet available. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.

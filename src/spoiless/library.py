@@ -24,6 +24,10 @@ def connect():
     try:
         db.execute("PRAGMA foreign_keys = ON")
         db.executescript("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS books (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
