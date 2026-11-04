@@ -30,6 +30,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
       :loading="loading"
       :busy="busy"
       :error="error"
+      :model="selectedModel"
       @retry="loadBooks"
       @delete="removeBook"
       @review="$emit('review', $event)"
@@ -37,7 +38,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
     <ChatGPTConnection @account-changing="accountVersion++" />
     <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />
     <SemanticModelSetup />
-    <p class="footnote">Recaps and questions are coming in later tasks.</p>
+    <p class="footnote">Recaps and conversation history are coming in later tasks.</p>
   </main>
 </template>
 
