@@ -180,6 +180,7 @@ class PassageResponse(BaseModel):
 def keyword_search(
     book_id: str, request: KeywordSearchRequest
 ) -> list[PassageResponse]:
+    from spoiless.retrieval import ProgressChanged
     from spoiless.retrieval import keyword_search as search
 
     try:
@@ -191,6 +192,8 @@ def keyword_search(
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except ProgressChanged as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 class ModelStatus(BaseModel):
@@ -219,3 +222,23 @@ def setup_semantic_model(request: ModelSetupRequest) -> ModelStatus:
             503, "Model setup failed. Check your connection and try again."
         ) from exc
     return ModelStatus(ready=True)
+
+
+@app.post("/api/books/{book_id}/hybrid-search", response_model=list[PassageResponse])
+def hybrid_search(book_id: str, request: KeywordSearchRequest) -> list[PassageResponse]:
+    from spoiless.retrieval import ModelUnavailable, ProgressChanged
+    from spoiless.retrieval import hybrid_search as search
+
+    try:
+        return [
+            PassageResponse(**vars(passage))
+            for passage in search(book_id, request.query)
+        ]
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ProgressChanged as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ModelUnavailable as exc:
+        raise HTTPException(503, str(exc)) from exc
