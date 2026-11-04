@@ -1,11 +1,12 @@
 """Control one local sign-in attempt without exposing credentials to the UI.
 
-The session is process-local and is not a persistent account manager. Do not
-use it for inference, refresh, or multiple-worker deployments.
+The sign-in attempt is process-local. Backend token access uses the shared OS
+lock to coordinate with other local processes.
 """
 
 import os
 import stat
+import time
 from dataclasses import dataclass
 from threading import Lock, Thread
 from typing import Literal
@@ -21,10 +22,20 @@ from spoiless.chatgpt_accounts import (
     get_account,
     select_saved_account,
 )
+from spoiless.chatgpt_auth import RESOURCE, VerifiedIdentity, has_plan_permission
 from spoiless.chatgpt_credentials import (
     CredentialStoreError,
     check_credential_store,
+    delete_credentials,
     load_credentials,
+    save_credentials,
+)
+from spoiless.chatgpt_exchange import (
+    TOKEN_URL,
+    ExchangeError,
+    RefreshTokenInvalid,
+    _client,
+    _json_request,
 )
 from spoiless.chatgpt_listener import LocalSignIn, Status
 from spoiless.library import database_path
@@ -174,3 +185,68 @@ class SignInManager:
             finally:
                 os.close(fd)
             self._session = None
+
+
+def get_valid_access_token(account_id: str) -> str:
+    """Get a saved account's usable access token for backend requests only."""
+    # ponytail: one lock serializes sign-ins and refreshes; split per account if needed.
+    fd = _acquire_attempt_lock()
+    try:
+        account = get_account(account_id)
+        record = load_credentials(account.client_id)
+        if (
+            record is None
+            or record.subject != account.subject
+            or record.access_token is None
+            or not has_plan_permission(record.scope)
+        ):
+            raise AccountError("This account needs to sign in again.")
+        if record.expires_at > time.time() + 60:
+            return record.access_token
+        if record.refresh_token is None:
+            raise AccountError("This account needs to sign in again.")
+        try:
+            with _client() as client:
+                response = _json_request(
+                    client,
+                    "POST",
+                    TOKEN_URL,
+                    refresh=True,
+                    data={
+                        "grant_type": "refresh_token",
+                        "client_id": record.client_id,
+                        "refresh_token": record.refresh_token,
+                        "resource": RESOURCE,
+                    },
+                )
+        except RefreshTokenInvalid:
+            delete_credentials(record.client_id)
+            raise AccountError("This account needs to sign in again.") from None
+        try:
+            expires_in = response["expires_in"]
+            if (
+                type(expires_in) is not int
+                or not 0 < expires_in <= 31536000
+                or not isinstance(response["token_type"], str)
+                or response["token_type"].casefold() != "bearer"
+            ):
+                raise ValueError
+            updated = type(record).model_validate(
+                {
+                    **record.model_dump(),
+                    "access_token": response["access_token"],
+                    "refresh_token": response["refresh_token"],
+                    "expires_at": float(time.time() + expires_in),
+                    "scope": response.get("scope", record.scope),
+                }
+            )
+            if not updated.refresh_token:
+                raise ValueError
+        except (KeyError, ValueError, TypeError):
+            raise ExchangeError("The OpenAI refresh response is invalid.") from None
+        save_credentials(updated, VerifiedIdentity(record.subject, record.email))
+        if not has_plan_permission(updated.scope):
+            raise AccountError("This account needs to sign in again.")
+        return updated.access_token
+    finally:
+        os.close(fd)

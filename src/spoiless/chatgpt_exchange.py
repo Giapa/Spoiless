@@ -40,6 +40,10 @@ class ExchangeError(Exception):
     """The authorization exchange or trusted-key lookup failed."""
 
 
+class RefreshTokenInvalid(ExchangeError):
+    """The provider confirmed that the renewable session cannot be used."""
+
+
 @dataclass(frozen=True, repr=False)
 class ConnectedAccount:
     client_id: str
@@ -67,12 +71,15 @@ def _client() -> httpx.Client:
     return httpx.Client(timeout=10.0, follow_redirects=False, trust_env=False)
 
 
-def _json_request(client: httpx.Client, method: str, url: str, **kwargs) -> dict:
+def _json_request(
+    client: httpx.Client, method: str, url: str, *, refresh=False, **kwargs
+) -> dict:
     try:
         with client.stream(
             method, url, headers={"Accept": "application/json"}, **kwargs
         ) as response:
-            response.raise_for_status()
+            if not refresh or response.status_code not in (400, 401):
+                response.raise_for_status()
             body = bytearray()
             for chunk in response.iter_bytes():
                 if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
@@ -81,6 +88,17 @@ def _json_request(client: httpx.Client, method: str, url: str, **kwargs) -> dict
         result = json.loads(body)
         if not isinstance(result, dict):
             raise ValueError("Unexpected response")
+        if refresh and response.status_code in (400, 401):
+            if isinstance(result.get("error"), str) and result["error"] in {
+                "invalid_grant",
+                "invalid_refresh_token",
+                "token_expired",
+                "refresh_token_expired",
+                "refresh_token_invalidated",
+                "refresh_token_reused",
+            }:
+                raise RefreshTokenInvalid("This account needs to sign in again.")
+            raise ValueError("Refresh failed")
         return result
     except (httpx.HTTPError, ValueError, UnicodeError):
         # Never surface server bodies, callback codes, or tokens in an error.
