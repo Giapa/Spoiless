@@ -1,14 +1,18 @@
 """Local API entry point."""
 
 from typing import Literal
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from spoiless import library
+from spoiless.chatgpt_credentials import CredentialStoreError
+from spoiless.chatgpt_session import SignInBusy, SignInManager, SignInStartError
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
 
 app = FastAPI(title="Spoiless")
+_sign_in = SignInManager()
 
 
 class HealthResponse(BaseModel):
@@ -242,3 +246,88 @@ def hybrid_search(book_id: str, request: KeywordSearchRequest) -> list[PassageRe
         raise HTTPException(409, str(exc)) from exc
     except ModelUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc
+
+
+class SignInResponse(BaseModel):
+    status: Literal[
+        "idle",
+        "pending",
+        "processing",
+        "connected",
+        "denied",
+        "failed",
+        "expired",
+        "cancelled",
+    ]
+    email: str | None = None
+    plan_usage_enabled: bool | None = None
+
+
+class SignInAction(BaseModel):
+    confirm: Literal[True]
+
+
+def _local_request(request: Request, *, mutation: bool = False) -> None:
+    """Limit sensitive local controls to loopback, same-origin browser requests."""
+    host = request.headers.get("host", "")
+    try:
+        parsed = urlsplit(f"http://{host}")
+        valid = (
+            request.client is not None
+            and request.client.host == "127.0.0.1"
+            and request.headers.getlist("host") == [host]
+            and parsed.hostname in {"127.0.0.1", "localhost"}
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.path == ""
+            and parsed.query == ""
+            and parsed.fragment == ""
+            and (parsed.port is None or 1 <= parsed.port <= 65535)
+            and parsed.netloc == host
+        )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise HTTPException(403, "Local access only.")
+    if mutation and (
+        request.headers.getlist("origin") != [f"http://{host}"]
+        or request.headers.get("x-spoiless-action") != "1"
+        or request.headers.get("content-type", "").split(";")[0].strip().lower()
+        != "application/json"
+    ):
+        raise HTTPException(403, "A same-origin app action is required.")
+
+
+@app.get("/api/chatgpt/sign-in", response_model=SignInResponse)
+def chatgpt_sign_in_status(request: Request, response: Response) -> SignInResponse:
+    _local_request(request)
+    response.headers["Cache-Control"] = "no-store"
+    return SignInResponse(**vars(_sign_in.state()))
+
+
+@app.post("/api/chatgpt/sign-in", response_model=SignInResponse)
+def start_chatgpt_sign_in(
+    request: Request, response: Response, action: SignInAction
+) -> SignInResponse:
+    _local_request(request, mutation=True)
+    try:
+        _sign_in.start()
+    except SignInBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except (CredentialStoreError, SignInStartError) as exc:
+        raise HTTPException(503, str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return SignInResponse(**vars(_sign_in.state()))
+
+
+@app.post("/api/chatgpt/sign-in/cancel", response_model=SignInResponse)
+def cancel_chatgpt_sign_in(
+    request: Request, response: Response, action: SignInAction
+) -> SignInResponse:
+    _local_request(request, mutation=True)
+    try:
+        _sign_in.cancel()
+    except SignInBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return SignInResponse(**vars(_sign_in.state()))

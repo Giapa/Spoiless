@@ -105,6 +105,11 @@ def _backend() -> SecretService.Keyring:
         ) from None
 
 
+def check_credential_store() -> None:
+    """Check for the Linux service without reading or writing credentials."""
+    _backend()
+
+
 def _account_key(client_id: str) -> str:
     if not _client_id(client_id) or client_id == DYNAMIC_CLIENT:
         raise CredentialStoreError("Invalid registered client ID.")

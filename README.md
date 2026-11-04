@@ -53,4 +53,4 @@ The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story t
 
 ## ChatGPT connection
 
-The sign-in request, local callback listener, token exchange and identity verification are tested offline with a simulated server. Linux secure credential storage has passed a temporary save/read/delete check on the development machine, but connecting an account is not yet available. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.
+The sign-in request, local callback listener, token exchange and identity verification are tested offline with a simulated server. Linux secure credential storage has passed a temporary save/read/delete check on the development machine, but the sign-in interface and persistent account management are not yet available. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.
