@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { reactive } from "vue";
+import PassageSearch from "./PassageSearch.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
 
 defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string }>();
+const searchAvailable = reactive<Record<string, boolean>>({});
 defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
 </script>
 
@@ -25,7 +28,12 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
             {{ book.section_count }} {{ book.section_count === 1 ? "section" : "sections" }} ·
             {{ book.chapters_confirmed ? "Chapters confirmed" : "Chapter review needed" }}
           </p>
-          <ReadingProgress v-if="book.chapters_confirmed" :book-id="book.id" />
+          <ReadingProgress
+            v-if="book.chapters_confirmed"
+            :book-id="book.id"
+            @availability="searchAvailable[book.id] = $event"
+          />
+          <PassageSearch v-if="searchAvailable[book.id]" :book-id="book.id" />
         </div>
         <div class="actions">
           <button
@@ -127,6 +135,7 @@ h2 {
   list-style: none;
 }
 .book-row {
+  align-items: flex-start;
   min-height: 88px;
   padding: 16px 24px;
 }

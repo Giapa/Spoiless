@@ -40,7 +40,7 @@ onMounted(load);
   <section class="model" aria-labelledby="model-heading">
     <h2 id="model-heading">Semantic search setup</h2>
     <p>Semantic search will find passages by meaning. The English model runs on this device.</p>
-    <p v-if="ready">Model downloaded. Semantic search is still being built.</p>
+    <p v-if="ready">Model downloaded. You can search by meaning in a book with saved progress.</p>
     <template v-else-if="ready === false">
       <p>The one-time model download is approximately 90 MB. No book text is sent.</p>
       <button type="button" :disabled="busy" @click="download">

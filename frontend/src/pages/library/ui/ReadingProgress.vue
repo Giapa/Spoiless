@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string }>();
+const emit = defineEmits<{ availability: [ready: boolean] }>();
 const schema = z.object({
   chapter_count: z.number().int().nonnegative(),
   current_chapter: z.number().int().nullable(),
@@ -10,24 +11,40 @@ const schema = z.object({
 const progress = ref<z.infer<typeof schema> | null>(null);
 const choice = ref("");
 const busy = ref(false);
+const loading = ref(false);
+let loadVersion = 0;
 const error = ref("");
 const notice = ref("");
 const endpoint = `/api/books/${encodeURIComponent(props.bookId)}/progress`;
 
 async function load() {
+  const version = ++loadVersion;
+  loading.value = true;
+  emit("availability", false);
   error.value = "";
+  notice.value = "";
   try {
     const response = await fetch(endpoint);
     if (!response.ok) throw new Error();
-    progress.value = schema.parse(await response.json());
+    const updated = schema.parse(await response.json());
+    if (version !== loadVersion) return;
+    progress.value = updated;
     choice.value = progress.value.current_chapter?.toString() ?? "";
+    emit("availability", progress.value.current_chapter !== null);
   } catch {
+    if (version !== loadVersion) return;
+    emit("availability", false);
     error.value = "Could not load reading progress.";
+  } finally {
+    if (version === loadVersion) loading.value = false;
   }
 }
 async function save() {
   if (!choice.value) return;
+  ++loadVersion;
+  loading.value = false;
   busy.value = true;
+  emit("availability", false);
   error.value = "";
   notice.value = "";
   try {
@@ -39,13 +56,28 @@ async function save() {
     if (!response.ok) throw new Error();
     progress.value = schema.parse(await response.json());
     notice.value = "Reading progress saved.";
+    emit("availability", progress.value.current_chapter !== null);
   } catch {
     error.value = "Could not save reading progress. Try again.";
   } finally {
     busy.value = false;
   }
 }
-onMounted(load);
+function changeChoice() {
+  notice.value = "";
+  emit("availability", Number(choice.value) === progress.value?.current_chapter);
+}
+function refresh() {
+  if (!busy.value) void load();
+}
+onMounted(() => {
+  void load();
+  window.addEventListener("focus", refresh);
+});
+onBeforeUnmount(() => {
+  ++loadVersion;
+  window.removeEventListener("focus", refresh);
+});
 </script>
 
 <template>
@@ -54,7 +86,12 @@ onMounted(load);
     <form v-if="progress && progress.chapter_count" @submit.prevent="save">
       <label :for="`progress-${bookId}`">Current chapter</label>
       <div class="controls">
-        <select :id="`progress-${bookId}`" v-model="choice" :disabled="busy">
+        <select
+          :id="`progress-${bookId}`"
+          v-model="choice"
+          :disabled="busy || loading"
+          @change="changeChoice"
+        >
           <option value="" disabled>Choose progress</option>
           <option
             v-for="chapter in Math.max(0, progress.chapter_count - 1)"
@@ -67,7 +104,7 @@ onMounted(load);
         </select>
         <button
           type="submit"
-          :disabled="busy || !choice || Number(choice) === progress.current_chapter"
+          :disabled="busy || loading || !choice || Number(choice) === progress.current_chapter"
         >
           Save
         </button>
