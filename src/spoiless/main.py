@@ -191,3 +191,31 @@ def keyword_search(
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+class ModelStatus(BaseModel):
+    ready: bool
+
+
+class ModelSetupRequest(BaseModel):
+    consent: Literal[True]
+
+
+@app.get("/api/semantic-model", response_model=ModelStatus)
+def semantic_model_status() -> ModelStatus:
+    from spoiless.embedding_model import model_ready
+
+    return ModelStatus(ready=model_ready())
+
+
+@app.post("/api/semantic-model", response_model=ModelStatus)
+def setup_semantic_model(request: ModelSetupRequest) -> ModelStatus:
+    from spoiless.embedding_model import setup_model
+
+    try:
+        setup_model()
+    except Exception as exc:
+        raise HTTPException(
+            503, "Model setup failed. Check your connection and try again."
+        ) from exc
+    return ModelStatus(ready=True)

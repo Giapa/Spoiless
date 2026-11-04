@@ -2,6 +2,7 @@
 import { useLibrary } from "../model/useLibrary";
 import AddBookButton from "./AddBookButton.vue";
 import BookList from "./BookList.vue";
+import SemanticModelSetup from "./SemanticModelSetup.vue";
 
 defineEmits<{ review: [book: { id: string; title: string }] }>();
 const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = useLibrary();
@@ -28,6 +29,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
       @delete="removeBook"
       @review="$emit('review', $event)"
     />
+    <SemanticModelSetup />
     <p class="footnote">Recaps and questions are coming in later tasks.</p>
   </main>
 </template>
