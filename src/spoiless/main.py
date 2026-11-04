@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from spoiless import library
+from spoiless.chatgpt_accounts import AccountError, list_accounts
 from spoiless.chatgpt_credentials import CredentialStoreError
 from spoiless.chatgpt_session import SignInBusy, SignInManager, SignInStartError
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
@@ -251,6 +252,7 @@ def hybrid_search(book_id: str, request: KeywordSearchRequest) -> list[PassageRe
 class SignInResponse(BaseModel):
     status: Literal[
         "idle",
+        "saved",
         "pending",
         "processing",
         "connected",
@@ -329,5 +331,43 @@ def cancel_chatgpt_sign_in(
         _sign_in.cancel()
     except SignInBusy as exc:
         raise HTTPException(409, str(exc)) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return SignInResponse(**vars(_sign_in.state()))
+
+
+class AccountResponse(BaseModel):
+    id: str
+    email: str | None
+    active: bool
+
+
+class AccountSelection(BaseModel):
+    account_id: str = Field(min_length=1, max_length=64)
+    confirm: Literal[True]
+
+
+@app.get("/api/chatgpt/accounts", response_model=list[AccountResponse])
+def chatgpt_accounts(request: Request, response: Response) -> list[AccountResponse]:
+    _local_request(request)
+    response.headers["Cache-Control"] = "no-store"
+    return [
+        AccountResponse(id=account.id, email=account.email, active=account.active)
+        for account in list_accounts()
+    ]
+
+
+@app.post("/api/chatgpt/accounts/select", response_model=SignInResponse)
+def select_chatgpt_account(
+    request: Request, response: Response, selection: AccountSelection
+) -> SignInResponse:
+    _local_request(request, mutation=True)
+    try:
+        _sign_in.select_account(selection.account_id)
+    except SignInBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except AccountError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except CredentialStoreError as exc:
+        raise HTTPException(503, str(exc)) from exc
     response.headers["Cache-Control"] = "no-store"
     return SignInResponse(**vars(_sign_in.state()))

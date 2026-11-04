@@ -15,6 +15,7 @@ try:
 except ImportError:  # The rest of the app can still run on unverified platforms.
     fcntl = None
 
+from spoiless.chatgpt_accounts import active_account, select_saved_account
 from spoiless.chatgpt_credentials import CredentialStoreError, check_credential_store
 from spoiless.chatgpt_listener import LocalSignIn, Status
 from spoiless.library import database_path
@@ -30,7 +31,7 @@ class SignInStartError(Exception):
 
 @dataclass(frozen=True)
 class SignInState:
-    status: Status | Literal["idle"]
+    status: Status | Literal["idle", "saved"]
     email: str | None = None
     plan_usage_enabled: bool | None = None
 
@@ -73,7 +74,12 @@ class SignInManager:
         with self._lock:
             session = self._session
             if session is None:
-                return SignInState("idle")
+                account = active_account()
+                return (
+                    SignInState("saved", account.email)
+                    if account
+                    else SignInState("idle")
+                )
             status = session.status
             if status == "connected":
                 account = session.account
@@ -134,3 +140,18 @@ class SignInManager:
             self._session.close()
             if self._session.status != "cancelled":
                 raise SignInBusy("Sign-in is already being processed.")
+
+    def select_account(self, account_id: str) -> None:
+        """Switch saved registrations without claiming their tokens are current."""
+        with self._lock:
+            if self._session is not None and self._session.status in {
+                "pending",
+                "processing",
+            }:
+                raise SignInBusy("A sign-in is already active.")
+            fd = _acquire_attempt_lock()
+            try:
+                select_saved_account(account_id)
+            finally:
+                os.close(fd)
+            self._session = None

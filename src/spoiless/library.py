@@ -28,6 +28,13 @@ def connect():
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS chatgpt_accounts (
+                id TEXT PRIMARY KEY,
+                client_id TEXT UNIQUE NOT NULL,
+                subject TEXT NOT NULL,
+                email TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             CREATE TABLE IF NOT EXISTS books (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,

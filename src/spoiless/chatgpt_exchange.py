@@ -14,6 +14,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from spoiless.chatgpt_accounts import activate_after_storage, remember_verified
 from spoiless.chatgpt_auth import (
     ISSUER,
     RESOURCE,
@@ -23,7 +24,12 @@ from spoiless.chatgpt_auth import (
     has_plan_permission,
     verify_identity,
 )
-from spoiless.chatgpt_credentials import CredentialRecord, save_credentials
+from spoiless.chatgpt_credentials import (
+    CredentialRecord,
+    CredentialStoreError,
+    load_credentials,
+    save_credentials,
+)
 
 TOKEN_URL = f"{ISSUER}/api/accounts/oauth/token"
 JWKS_URL = f"{ISSUER}/.well-known/jwks.json"
@@ -195,5 +201,10 @@ def exchange_and_store(
             )
         except ValidationError:
             raise ExchangeError("The OpenAI sign-in response is invalid.") from None
+    existing = load_credentials(client_id)
+    if existing is not None and existing.subject != identity.subject:
+        raise CredentialStoreError("The registered client belongs to another account.")
+    account_id = remember_verified(client_id, identity)
     save_credentials(record, identity)
+    activate_after_storage(account_id)
     return ConnectedAccount(client_id, identity, has_plan_permission(record.scope))

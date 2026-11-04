@@ -12,7 +12,8 @@ from spoiless.chatgpt_auth import AuthorizationAttempt, InvalidAuthorization
 
 
 @pytest.fixture
-def fixture(monkeypatch):
+def fixture(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     attempt = AuthorizationAttempt("http://127.0.0.1:1455/auth/callback")
     claims = {
@@ -36,6 +37,7 @@ def fixture(monkeypatch):
         "scope": "openid offline_access resource.invoke chatgpt.tokens.use.direct",
     }
     saved = []
+    monkeypatch.setattr(exchange, "load_credentials", lambda client_id: None)
     monkeypatch.setattr(
         exchange,
         "save_credentials",
@@ -87,6 +89,9 @@ def test_exchange_saves_only_after_openai_signature_verification(fixture, monkey
     wire(monkeypatch, handler)
     account = exchange.exchange_and_store(attempt, callback(attempt))
     assert len(requests) == 2 and len(saved) == 1
+    from spoiless import chatgpt_accounts as accounts
+
+    assert accounts.active_account().client_id == account.client_id
     assert account.client_id == "oaiapp_123" and account.plan_usage_enabled
     assert account.identity.subject == "reader-subject"
     assert "access-secret" not in repr(account)
@@ -159,6 +164,9 @@ def test_invalid_identity_or_key_never_reaches_storage(fixture, monkeypatch, fai
     with pytest.raises((exchange.ExchangeError, InvalidAuthorization)):
         exchange.exchange_and_store(attempt, callback(attempt))
     assert not saved
+    from spoiless import chatgpt_accounts as accounts
+
+    assert accounts.list_accounts() == []
 
 
 def test_returning_account_mismatch_and_callback_rejection(fixture, monkeypatch):
@@ -265,3 +273,85 @@ def test_store_failure_does_not_report_connected(fixture, monkeypatch):
     monkeypatch.setattr(exchange, "save_credentials", fail)
     with pytest.raises(CredentialStoreError):
         exchange.exchange_and_store(attempt, callback(attempt))
+
+
+def test_failed_keyring_save_preserves_previous_active_account(fixture, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt_auth import VerifiedIdentity
+    from spoiless.chatgpt_credentials import CredentialStoreError
+
+    _, attempt, _, jwk, body, _ = fixture
+    old = accounts.remember_verified(
+        "oaiapp_old", VerifiedIdentity("old-subject", None)
+    )
+    accounts.activate_after_storage(old)
+    wire(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200, json=body if request.method == "POST" else {"keys": [jwk]}
+        ),
+    )
+
+    def fail(*args):
+        raise CredentialStoreError("Keyring unavailable.")
+
+    monkeypatch.setattr(exchange, "save_credentials", fail)
+    with pytest.raises(CredentialStoreError):
+        exchange.exchange_and_store(attempt, callback(attempt))
+    assert accounts.active_account().id == old
+    staged = [
+        item for item in accounts.list_accounts() if item.client_id == "oaiapp_123"
+    ]
+    assert len(staged) == 1 and not staged[0].active
+    monkeypatch.setattr(accounts, "load_credentials", lambda client_id: None)
+    with pytest.raises(accounts.AccountError):
+        accounts.select_saved_account(staged[0].id)
+    assert accounts.active_account().id == old
+
+
+def test_saved_credentials_can_be_recovered_after_activation_failure(
+    fixture, monkeypatch
+):
+    from spoiless import chatgpt_accounts as accounts
+
+    _, attempt, _, jwk, body, saved = fixture
+    wire(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200, json=body if request.method == "POST" else {"keys": [jwk]}
+        ),
+    )
+
+    def fail(*args):
+        raise OSError("Simulated interruption")
+
+    monkeypatch.setattr(exchange, "activate_after_storage", fail)
+    with pytest.raises(OSError):
+        exchange.exchange_and_store(attempt, callback(attempt))
+    assert len(saved) == 1
+    staged = accounts.list_accounts()[0]
+    assert not staged.active
+    monkeypatch.setattr(accounts, "load_credentials", lambda client_id: saved[0][0])
+    accounts.select_saved_account(staged.id)
+    assert accounts.active_account().id == staged.id
+
+
+def test_existing_keyring_identity_mismatch_is_not_registered(fixture, monkeypatch):
+    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt_credentials import CredentialStoreError
+
+    _, attempt, _, jwk, body, saved = fixture
+    wire(
+        monkeypatch,
+        lambda request: httpx.Response(
+            200, json=body if request.method == "POST" else {"keys": [jwk]}
+        ),
+    )
+    monkeypatch.setattr(
+        exchange,
+        "load_credentials",
+        lambda client_id: type("Old", (), {"subject": "other"})(),
+    )
+    with pytest.raises(CredentialStoreError):
+        exchange.exchange_and_store(attempt, callback(attempt))
+    assert not saved and not accounts.list_accounts()

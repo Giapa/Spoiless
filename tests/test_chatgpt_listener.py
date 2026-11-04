@@ -183,6 +183,7 @@ def test_listener_and_exchange_work_together_without_real_account(
         ),
     )
     saved = []
+    monkeypatch.setattr(exchange, "load_credentials", lambda client_id: None)
     monkeypatch.setattr(
         exchange, "save_credentials", lambda record, identity: saved.append(record)
     )
