@@ -164,3 +164,30 @@ def update_progress(book_id: str, request: ProgressRequest) -> ProgressResponse:
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+
+
+class KeywordSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+
+
+class PassageResponse(BaseModel):
+    section_position: int
+    character_offset: int
+    text: str
+
+
+@app.post("/api/books/{book_id}/keyword-search", response_model=list[PassageResponse])
+def keyword_search(
+    book_id: str, request: KeywordSearchRequest
+) -> list[PassageResponse]:
+    from spoiless.retrieval import keyword_search as search
+
+    try:
+        return [
+            PassageResponse(**vars(passage))
+            for passage in search(book_id, request.query)
+        ]
+    except library.BookNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
