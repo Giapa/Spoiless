@@ -1,5 +1,7 @@
 """Backend-only ChatGPT Responses API adapter, not a book-answer workflow."""
 
+from collections.abc import Callable
+
 import httpx
 from openai import APIError, OpenAI
 
@@ -26,7 +28,13 @@ def _known_code(code: object) -> str | None:
     return None
 
 
-def generate_response(account_id: str, model: str, prompt: str) -> str:
+def generate_response(
+    account_id: str,
+    model: str,
+    prompt: str,
+    *,
+    before_send: Callable[[], None] | None = None,
+) -> str:
     """Return text only after OpenAI confirms the streamed response completed."""
     if model not in {item["slug"] for item in list_available_models(account_id)}:
         raise InferenceError("This model is not available to the selected account.")
@@ -34,9 +42,17 @@ def generate_response(account_id: str, model: str, prompt: str) -> str:
     output = []
     output_size = 0
     completed = False
+    guard_error: Exception | None = None
     try:
 
         def use_account_headers(request: httpx.Request) -> None:
+            nonlocal guard_error
+            if before_send is not None:
+                try:
+                    before_send()
+                except Exception as exc:
+                    guard_error = exc
+                    raise
             allowed = {
                 "host",
                 "content-length",
@@ -104,6 +120,8 @@ def generate_response(account_id: str, model: str, prompt: str) -> str:
                                 )
                             completed = True
     except APIError as exc:
+        if guard_error is not None:
+            raise guard_error from None
         raise InferenceError(
             "The ChatGPT request could not be completed.", code=_known_code(exc.code)
         ) from None
