@@ -127,3 +127,18 @@ def test_missing_or_invalid_navigation_does_not_confirm_or_reject_book() -> None
         epub(extra={"book/content.opf": package, "book/toc.xhtml": "<broken"})
     )
     assert book.sections and book.navigation == ()
+
+
+def test_document_head_is_not_in_book_passages() -> None:
+    book = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": (
+                    "<html><head><title>Hidden document title</title>"
+                    "<style>.x{color:red}</style></head>"
+                    "<body><p>Visible chapter</p></body></html>"
+                )
+            }
+        )
+    )
+    assert book.sections[0].text == "Visible chapter"

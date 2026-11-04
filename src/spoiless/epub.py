@@ -55,7 +55,7 @@ class TextExtractor(HTMLParser):
         self.raw_length += len(text)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() in {"script", "style"}:
+        if tag.lower() in {"script", "style", "head"}:
             self.hidden_depth += 1
         elif not self.hidden_depth and tag.lower() in {
             "p",
@@ -75,7 +75,7 @@ class TextExtractor(HTMLParser):
                     )
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() in {"script", "style"} and self.hidden_depth:
+        if tag.lower() in {"script", "style", "head"} and self.hidden_depth:
             self.hidden_depth -= 1
         elif not self.hidden_depth and tag.lower() in {
             "p",
