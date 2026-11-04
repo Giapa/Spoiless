@@ -1,6 +1,6 @@
 # ChatGPT sign-in groundwork
 
-Spoiless does **not** yet sign in to ChatGPT. The offline code in `src/spoiless/chatgpt_auth.py` creates a stable opaque host ID and short-lived authorization attempts, validates a one-time callback, verifies an ID token against a supplied trusted key, and checks the granted plan-use scope. It has no UI, listener, token exchange, credentials or inference.
+Spoiless does **not** yet sign in to ChatGPT. The offline code in `src/spoiless/chatgpt_auth.py` creates a stable opaque host ID and short-lived authorization attempts, validates a one-time callback, verifies an ID token against a supplied trusted key, and checks the granted plan-use scope. The backend also has a Linux Secret Service credential-store layer. There is no UI, listener, token exchange, active account session or inference yet.
 
 The signed-token verifier currently accepts RS256 only. This is a conservative restriction that must be checked against OpenAI's actual signing keys before enabling sign-in. Tests use locally generated keys, not OpenAI accounts or network access. The OpenAI documentation requires checking the issuer, audience, expiry and nonce and verifying the signature with OpenAI's published JWKS: [registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [identity verification](https://developers.openai.com/siwc/website).
 
@@ -8,5 +8,8 @@ Before enabling this flow:
 
 - Start a short-lived loopback listener before opening the system browser. Keep attempts and PKCE verifiers in the backend, consume them once, and prevent callback query strings and authorization URLs from appearing in access logs.
 - Exchange the code with the documented token endpoint using the returned issued client ID. Fetch and cache keys only from OpenAI's trusted discovery/JWKS endpoints; never accept a key from the browser. Validate the ID token and granted scopes before accepting an account.
-- Store credentials in an appropriate OS credential store, fail closed if secure storage is unavailable, and test actual Linux support. Keep credentials out of the frontend, logs and the library database. Handle expiry, rotating refresh tokens, declined consent, sign-out and account switching.
+- The credential-store layer uses Linux Secret Service directly and fails closed when unavailable. A temporary record was saved, read and removed successfully on this Linux machine on 2026-11-04; other machines and operating systems remain unverified. Keep credentials out of the frontend, logs and library database.
+- Connect the store only after verifying the ID token and scope. Handle expiry, rotating refresh tokens, declined consent, sign-out and account switching. Serialize refresh read/exchange/write across processes before enabling token refresh; the store alone does not provide that locking. Local deletion does not revoke access remotely.
 - Discover models and test an eligible account's end-to-end Responses API flow. A valid identity does not by itself grant plan usage, and no account eligibility has been checked.
+
+Each issued client ID has a separate keyring item. A single item contains its token set, and it cannot overwrite a previously stored registration with a different verified subject. Identity-only sign-ins can be stored without granting plan usage. Stored credential fields are omitted from the record's normal representation; callers must still avoid logging the serialized record.
