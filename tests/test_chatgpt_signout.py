@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from spoiless import main
 from spoiless.chatgpt import accounts as chatgpt_accounts
+from spoiless.chatgpt import api as chatgpt_api
 from spoiless.chatgpt import credentials as chatgpt_credentials
 from spoiless.chatgpt import session as chatgpt_session
 from spoiless.chatgpt.auth import VerifiedIdentity
@@ -32,7 +33,7 @@ def account(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     keyring = MemoryKeyring()
     monkeypatch.setattr(chatgpt_credentials, "_backend", lambda: keyring)
-    monkeypatch.setattr(main, "_sign_in", chatgpt_session.SignInManager())
+    monkeypatch.setattr(chatgpt_api, "_sign_in", chatgpt_session.SignInManager())
     identity = VerifiedIdentity("reader", "reader@example.test")
     account_id = chatgpt_accounts.remember_verified("oaiapp_reader", identity)
     record = CredentialRecord(

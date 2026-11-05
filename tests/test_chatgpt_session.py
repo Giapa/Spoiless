@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from spoiless import main
+from spoiless.chatgpt import api as chatgpt_api
 from spoiless.chatgpt import session as chatgpt_session
 from spoiless.chatgpt.auth import VerifiedIdentity
 from spoiless.chatgpt.credentials import CredentialStoreError
@@ -56,7 +57,7 @@ def setup(tmp_path, monkeypatch):
 
     monkeypatch.setattr(chatgpt_session, "LocalSignIn", make_session)
     manager = chatgpt_session.SignInManager()
-    monkeypatch.setattr(main, "_sign_in", manager)
+    monkeypatch.setattr(chatgpt_api, "_sign_in", manager)
     yield manager, sessions
     if sessions and sessions[-1].status == "pending":
         manager.cancel()

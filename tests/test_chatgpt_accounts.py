@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from spoiless import main
 from spoiless.chatgpt import accounts
+from spoiless.chatgpt import api as chatgpt_api
 from spoiless.chatgpt import session as chatgpt_session
 from spoiless.chatgpt.auth import VerifiedIdentity
 from spoiless.chatgpt.credentials import CredentialRecord
@@ -112,7 +113,7 @@ def test_registry_api_exposes_no_tokens_and_only_selects_valid_accounts(
         saved.client_id, VerifiedIdentity(saved.subject, saved.email)
     )
     manager = chatgpt_session.SignInManager()
-    monkeypatch.setattr(main, "_sign_in", manager)
+    monkeypatch.setattr(chatgpt_api, "_sign_in", manager)
     headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
     with TestClient(
         main.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 50000)
