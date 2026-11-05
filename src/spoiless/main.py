@@ -540,6 +540,7 @@ def _run_book_generation(
 class RecapRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     chapter: int = Field(ge=1, strict=True)
+    mode: Literal["chapter", "through"] = "chapter"
     model: str = Field(min_length=1, max_length=256, strict=True)
     confirm: bool = Field(strict=True)
 
@@ -570,7 +571,9 @@ def recap_book(
         request,
         response,
         action.confirm,
-        lambda account: recap_chapter(book_id, account, action.model, action.chapter),
+        lambda account: recap_chapter(
+            book_id, account, action.model, action.chapter, action.mode
+        ),
     )
 
 
