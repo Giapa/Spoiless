@@ -373,10 +373,237 @@ def test_recap_refuses_unread_chapter_without_contacting_openai(
     assert requests == []
 
 
+@pytest.mark.parametrize("mode", ["chapter", "through"])
+def test_long_chapter_recap_combines_validated_source_quotes(
+    reading_setup, monkeypatch, mode
+):
+    prefix = "🐈 PRIOR_CONTEXT "
+    chapter = "FIRST_FACT " + "a" * 24000 + " LAST_FACT"
+    book = library.add_book(
+        Book("Long", (Section(prefix + chapter + "UNREAD_SECRET"),))
+    )
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, len(prefix)),
+            library.ReadingUnitStart("chapter", 0, len(prefix + chapter)),
+        ],
+    )
+    library.set_progress(book, 3)
+    payloads = []
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        prompt = json.loads(request.content)["input"][0]["content"]
+        payload = json.loads(prompt.split("\n", 1)[1])
+        payloads.append(payload)
+        if "summaries" in payload:
+            quote, index = "LAST_FACT", 1
+        else:
+            quote, index = ("FIRST_FACT", 0) if len(payloads) == 1 else ("LAST_FACT", 0)
+        answer = json.dumps(
+            {
+                "answer": "A key event.",
+                "citations": [{"passage": index, "quote": quote}],
+            }
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 2, "mode": mode, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == 200
+    assert response.json()["citations"] == [
+        {
+            "section_position": 0,
+            "character_offset": len(prefix) + chapter.index("LAST_FACT"),
+            "quote": "LAST_FACT",
+        }
+    ]
+    assert len(payloads) == 3
+    assert all(sum(map(len, payload["passages"])) <= 24000 for payload in payloads)
+    assert "UNREAD_SECRET" not in json.dumps(payloads)
+    assert ("PRIOR_CONTEXT" in json.dumps(payloads)) == (mode == "through")
+
+
+@pytest.mark.parametrize(
+    "failure", ["before_second", "during_second", "bad_intermediate", "bad_final"]
+)
+def test_long_recap_withholds_partial_or_stale_results(
+    reading_setup, monkeypatch, failure
+):
+    first = "Earlier chapter. "
+    chapter = "FIRST_FACT " + "a" * 24000 + " LAST_FACT"
+    book = library.add_book(Book("Long", (Section(first + chapter),)))
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, len(first)),
+        ],
+    )
+    library.set_progress(book, 3)
+    posts = []
+    lookups = 0
+
+    def handle(request):
+        nonlocal lookups
+        if request.method == "GET":
+            lookups += 1
+            if failure == "before_second" and lookups == 2:
+                library.set_progress(book, 2)
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        posts.append(request)
+        if failure == "during_second" and len(posts) == 2:
+            library.set_progress(book, 2)
+        quote, index = (
+            ("FIRST_FACT", 0)
+            if len(posts) == 1
+            else ("LAST_FACT", 0 if len(posts) == 2 else 1)
+        )
+        if (
+            failure == "bad_intermediate"
+            and len(posts) == 2
+            or failure == "bad_final"
+            and len(posts) == 3
+        ):
+            quote = "HIDDEN_FACT"
+        answer = json.dumps(
+            {"answer": "HIDDEN_FACT", "citations": [{"passage": index, "quote": quote}]}
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 2, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == (
+        409 if failure in ("before_second", "during_second") else 502
+    )
+    assert "HIDDEN_FACT" not in response.text
+    if failure == "before_second":
+        assert len(posts) == 1
+    if failure == "bad_intermediate":
+        assert len(posts) == 2
+
+
+@pytest.mark.parametrize("oversized", ["summary", "quote", "citations"])
+def test_long_recap_rejects_oversized_intermediate_output(
+    reading_setup, monkeypatch, oversized
+):
+    chapter = "F" * 24001
+    book = library.add_book(Book("Long", (Section(chapter + "unread"),)))
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, len(chapter)),
+        ],
+    )
+    library.set_progress(book, 2)
+    posts = []
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        posts.append(request)
+        quote = "F" * (201 if oversized == "quote" else 1)
+        answer = json.dumps(
+            {
+                "answer": "x" * (1001 if oversized == "summary" else 1),
+                "citations": [{"passage": 0, "quote": quote}]
+                * (4 if oversized == "citations" else 1),
+            }
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 1, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == 502
+    assert len(posts) == 1
+
+
 def test_recap_refuses_oversized_chapter_without_contacting_openai(
     reading_setup, monkeypatch
 ):
-    chapter = "a" * 24001
+    chapter = "a" * 240001
     book = library.add_book(Book("Long", (Section(chapter + "unread"),)))
     library.confirm_reading_units(
         book,
@@ -407,8 +634,8 @@ def test_recap_refuses_oversized_chapter_without_contacting_openai(
 
 
 def test_cumulative_recap_refuses_oversized_selection(reading_setup, monkeypatch):
-    first = "a" * 12000
-    second = "b" * 12001
+    first = "a" * 120000
+    second = "b" * 120001
     book = library.add_book(Book("Long", (Section(first + second + "unread"),)))
     library.confirm_reading_units(
         book,

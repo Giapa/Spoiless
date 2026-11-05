@@ -53,7 +53,8 @@ for suffix in ("a", "b", "c", "d"):
         chatgpt_accounts.activate_after_storage(account_id)
 
 
-text = "Mira found the key. "
+long_recap = os.environ.get("SPOILESS_TEST_LONG_RECAP") == "1"
+text = "Mira found the key. " + ("a" * 24000 + " LAST_FACT" if long_recap else "")
 book_id = library.add_book(
     Book("The Sample Book", (Section(text + "UNREAD_SECRET ending."),))
 )
@@ -108,6 +109,31 @@ def fake_openai(self, request):
     ):
         body = json.loads(request.content)
         prompt = body["input"][0]["content"]
+        if long_recap and body["model"] == "a1":
+            payload = json.loads(prompt.split("\n", 1)[1])
+            if "UNREAD_SECRET" in prompt:
+                return httpx.Response(400)
+            if "summaries" in payload:
+                quote, index = "LAST_FACT", 1
+            else:
+                quote = "found the key" if "found the key" in prompt else "LAST_FACT"
+                index = 0
+            answer = json.dumps(
+                {
+                    "answer": "A supported recap.",
+                    "citations": [{"passage": index, "quote": quote}],
+                }
+            )
+            delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                text=(
+                    f"data: {delta}\n\n"
+                    'data: {"type":"response.completed",'
+                    '"response":{"status":"completed"}}\n\n'
+                ),
+            )
         if body["model"] != "a3" and (
             "UNREAD_SECRET" in prompt or "Mira found the key" not in prompt
         ):
