@@ -106,7 +106,10 @@ def test_answer_api_returns_verified_text_without_unread_material(
             json={"question": "Who found the key?", "model": "model", "confirm": True},
             headers=headers,
         )
+        history = client.get(f"/api/books/{book}/conversation")
     assert response.status_code == 200
+    assert history.status_code == 200
+    assert history.json() == [{"question": "Who found the key?", **response.json()}]
     assert response.json() == {
         "answer": "Mira found the key.",
         "citations": [
@@ -146,6 +149,109 @@ def test_remote_or_unconfirmed_requests_do_not_contact_openai(
             )
             assert response.status_code in (403, 422)
     assert requests == []
+
+
+def test_conversation_follows_reading_progress(reading_setup):
+    book, _ = reading_setup
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        answer = client.post(
+            f"/api/books/{book}/answer",
+            json={"question": "zebra", "model": "model", "confirm": True},
+            headers=headers,
+        )
+        assert answer.status_code == 200
+        original = client.get(f"/api/books/{book}/conversation").json()
+        assert len(original) == 1
+        assert (
+            client.put(
+                f"/api/books/{book}/progress", json={"current_chapter": 3}
+            ).status_code
+            == 200
+        )
+        assert client.get(f"/api/books/{book}/conversation").json() == original
+        assert (
+            client.put(
+                f"/api/books/{book}/progress", json={"current_chapter": 2}
+            ).status_code
+            == 200
+        )
+        assert client.get(f"/api/books/{book}/conversation").json() == []
+        assert (
+            client.put(
+                f"/api/books/{book}/progress", json={"current_chapter": 3}
+            ).status_code
+            == 200
+        )
+        assert client.get(f"/api/books/{book}/conversation").json() == []
+
+
+def test_reconfirming_chapters_starts_a_new_conversation(reading_setup):
+    book, _ = reading_setup
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        assert (
+            client.post(
+                f"/api/books/{book}/answer",
+                json={"question": "zebra", "model": "model", "confirm": True},
+                headers=headers,
+            ).status_code
+            == 200
+        )
+        units = client.get(f"/api/books/{book}/reading-units").json()
+        assert (
+            client.put(
+                f"/api/books/{book}/reading-units", json={"units": units}
+            ).status_code
+            == 204
+        )
+        assert (
+            client.put(
+                f"/api/books/{book}/progress", json={"current_chapter": 2}
+            ).status_code
+            == 200
+        )
+        assert client.get(f"/api/books/{book}/conversation").json() == []
+
+
+def test_conversations_are_isolated_by_book_and_require_local_access(reading_setup):
+    book, _ = reading_setup
+    other = library.add_book(Book("Other", (Section("First. Second."),)))
+    library.confirm_reading_units(
+        other,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, 7),
+        ],
+    )
+    library.set_progress(other, 2)
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        assert (
+            client.post(
+                f"/api/books/{book}/answer",
+                json={"question": "zebra", "model": "model", "confirm": True},
+                headers=headers,
+            ).status_code
+            == 200
+        )
+        assert client.get(f"/api/books/{other}/conversation").json() == []
+        response = client.get(f"/api/books/{book}/conversation")
+        assert response.headers["cache-control"] == "no-store"
+        assert len(response.json()) == 1
+        assert client.get("/api/books/missing/conversation").status_code == 404
+        assert client.delete(f"/api/books/{book}").status_code == 204
+        assert client.get(f"/api/books/{book}/conversation").status_code == 404
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("192.0.2.1", 1234)
+    ) as remote:
+        assert remote.get(f"/api/books/{other}/conversation").status_code == 403
 
 
 def test_invalid_citation_is_withheld_with_safe_error(reading_setup, monkeypatch):
@@ -193,7 +299,9 @@ def test_invalid_citation_is_withheld_with_safe_error(reading_setup, monkeypatch
             json={"question": "key", "model": "model", "confirm": True},
             headers=headers,
         )
+        history = client.get(f"/api/books/{book}/conversation")
     assert response.status_code == 502
+    assert history.json() == []
     assert "UNREAD_SECRET" not in response.text
     assert "secret-token" not in response.text
 
@@ -244,7 +352,9 @@ def test_progress_change_during_request_returns_conflict(reading_setup, monkeypa
             json={"question": "key", "model": "model", "confirm": True},
             headers=headers,
         )
+        history = client.get(f"/api/books/{book}/conversation")
     assert response.status_code == 409
+    assert history.json() == []
     assert "Mira" not in response.text
 
 

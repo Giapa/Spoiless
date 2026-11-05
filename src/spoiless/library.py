@@ -60,6 +60,14 @@ def connect():
                 book_id TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
                 current_chapter INTEGER NOT NULL CHECK (current_chapter >= 2)
             );
+            CREATE TABLE IF NOT EXISTS conversation_turns (
+                id INTEGER PRIMARY KEY,
+                book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                citations TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
+            );
             CREATE TABLE IF NOT EXISTS passage_embeddings (
                 book_id TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
                 section_position INTEGER NOT NULL,
@@ -215,6 +223,10 @@ def confirm_reading_units(book_id: str, units: list[ReadingUnitStart]) -> None:
                 )
             previous = point
         # Changing the chapter map invalidates the old progress boundary.
+        db.execute(
+            "UPDATE conversation_turns SET active = 0 WHERE book_id = ? AND active = 1",
+            (book_id,),
+        )
         db.execute("DELETE FROM reading_progress WHERE book_id = ?", (book_id,))
         db.execute("DELETE FROM reading_units WHERE book_id = ?", (book_id,))
         db.executemany(
@@ -283,6 +295,15 @@ def set_progress(book_id: str, current_chapter: int) -> ReadingProgress:
             or not 2 <= current_chapter <= progress.chapter_count + 1
         ):
             raise ValueError("Confirm chapters and choose a valid current chapter.")
+        if (
+            progress.current_chapter is not None
+            and current_chapter < progress.current_chapter
+        ):
+            db.execute(
+                "UPDATE conversation_turns SET active = 0 "
+                "WHERE book_id = ? AND active = 1",
+                (book_id,),
+            )
         db.execute(
             """INSERT INTO reading_progress (book_id, current_chapter) VALUES (?, ?)
                ON CONFLICT(book_id) DO UPDATE

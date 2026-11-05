@@ -426,6 +426,41 @@ class AnswerResponse(BaseModel):
     citations: list[AnswerCitation]
 
 
+class ConversationTurn(AnswerResponse):
+    question: str
+
+
+@app.get("/api/books/{book_id}/conversation", response_model=list[ConversationTurn])
+def conversation(
+    book_id: str, request: Request, response: Response
+) -> list[ConversationTurn]:
+    import json
+
+    _local_request(request)
+    with library.connect() as db:
+        db.execute("BEGIN")
+        try:
+            progress = library._progress(db, book_id)
+        except library.BookNotFound:
+            raise HTTPException(404, "Book not found.") from None
+        if progress.current_chapter is None or not (
+            2 <= progress.current_chapter <= progress.chapter_count + 1
+        ):
+            raise HTTPException(
+                422, "Confirm chapters and select reading progress first."
+            )
+        rows = db.execute(
+            "SELECT question, answer, citations FROM conversation_turns "
+            "WHERE book_id = ? AND active = 1 ORDER BY id",
+            (book_id,),
+        ).fetchall()
+    response.headers["Cache-Control"] = "no-store"
+    return [
+        ConversationTurn(question=q, answer=a, citations=json.loads(c))
+        for q, a, c in rows
+    ]
+
+
 @app.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
 def answer_book(
     book_id: str, request: Request, response: Response, action: AnswerRequest

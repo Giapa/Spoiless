@@ -84,7 +84,10 @@ onBeforeUnmount(() => {
         Your question and relevant passages from completed chapters are sent to OpenAI. AI answers
         may contain spoilers.
       </p>
-      <p>Answers are not saved and clear when you leave this window.</p>
+      <p>
+        Questions and answers are saved on this device. The displayed answer clears when you leave
+        this window.
+      </p>
       <p v-if="model">
         Using ChatGPT plan ·
         <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer"
