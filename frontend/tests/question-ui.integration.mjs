@@ -141,3 +141,73 @@ test("leaving the window clears a displayed answer", async () => {
     await page.getByText("Mira found the key.").waitFor({ state: "hidden" });
   } finally { await browser.close(); }
 });
+
+test("reader can reopen saved questions, answers and citations", async () => {
+  const { browser, page } = await openApp();
+  try {
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    await page.getByText("Ask about completed chapters").click();
+    await page.getByRole("textbox", { name: "Your question" }).fill("What did Mira find?");
+    await page.getByRole("button", { name: "Ask" }).click();
+    await page.getByText("Mira found the key.").waitFor();
+    await page.reload();
+    await page.getByText("Conversation history").click();
+    const history = page.getByRole("region", { name: "Conversation history" });
+    const turn = history.getByRole("listitem").filter({ hasText: "What did Mira find?" });
+    await turn.getByText("Mira found the key.").waitFor();
+    await turn.getByText("found the key", { exact: true }).waitFor();
+  } finally { await browser.close(); }
+});
+
+test("moving backward hides the old conversation even after moving forward again", async () => {
+  const { browser, page } = await openApp();
+  try {
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    await progress.selectOption({ label: "Finished book" });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a3");
+    await page.getByText("Ask about completed chapters").click();
+    await page.getByRole("textbox", { name: "Your question" }).fill("Who found the key?");
+    await page.getByRole("button", { name: "Ask" }).click();
+    await page.getByText(/UNREAD_SECRET/).first().waitFor();
+    await page.getByText("Conversation history", { exact: true }).click();
+    const history = page.getByRole("region", { name: "Conversation history" });
+    await history.getByText(/UNREAD_SECRET/).first().waitFor();
+    await progress.selectOption({ label: "Chapter 2" });
+    assert.equal(await history.count(), 0);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+    await page.getByText("Conversation history", { exact: true }).click();
+    await history.getByText("No questions in this conversation yet.").waitFor();
+    await progress.selectOption({ label: "Finished book" });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+    await page.getByText("Conversation history", { exact: true }).click();
+    await history.getByText("No questions in this conversation yet.").waitFor();
+  } finally { await browser.close(); }
+});
+
+test("an open history updates after asking and closes when leaving the window", async () => {
+  const { browser, page } = await openApp();
+  try {
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    if (await progress.inputValue() !== "2") {
+      await progress.selectOption({ label: "Chapter 2" });
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await page.getByText("Reading progress saved.").waitFor();
+    }
+    await page.getByText("Conversation history", { exact: true }).click();
+    const history = page.getByRole("region", { name: "Conversation history" });
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    await page.getByText("Ask about completed chapters").click();
+    await page.getByRole("textbox", { name: "Your question" }).fill("Where was the key?");
+    await page.getByRole("button", { name: "Ask" }).click();
+    await history.getByText("Where was the key?").waitFor();
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await history.waitFor({ state: "hidden" });
+  } finally { await browser.close(); }
+});

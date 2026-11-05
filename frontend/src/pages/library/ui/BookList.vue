@@ -2,11 +2,13 @@
 import { reactive } from "vue";
 import PassageSearch from "./PassageSearch.vue";
 import BookQuestion from "./BookQuestion.vue";
+import ConversationHistory from "./ConversationHistory.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
 
 defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string; model: string }>();
 const searchAvailable = reactive<Record<string, boolean>>({});
+const historyVersion = reactive<Record<string, number>>({});
 defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
 </script>
 
@@ -35,7 +37,17 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
             @availability="searchAvailable[book.id] = $event"
           />
           <PassageSearch v-if="searchAvailable[book.id]" :book-id="book.id" />
-          <BookQuestion v-if="searchAvailable[book.id]" :book-id="book.id" :model="model" />
+          <BookQuestion
+            v-if="searchAvailable[book.id]"
+            :book-id="book.id"
+            :model="model"
+            @saved="historyVersion[book.id] = (historyVersion[book.id] ?? 0) + 1"
+          />
+          <ConversationHistory
+            v-if="searchAvailable[book.id]"
+            :book-id="book.id"
+            :version="historyVersion[book.id] ?? 0"
+          />
         </div>
         <div class="actions">
           <button

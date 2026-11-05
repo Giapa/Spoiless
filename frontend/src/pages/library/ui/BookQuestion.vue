@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string; model: string }>();
+const emit = defineEmits<{ saved: [] }>();
 const question = ref("");
 const busy = ref(false);
 const error = ref("");
@@ -56,7 +57,10 @@ async function ask() {
       throw new Error("Could not answer the question. Please try again.");
     }
     const result = schema.parse(await response.json());
-    if (request === controller) answer.value = result;
+    if (request === controller) {
+      answer.value = result;
+      emit("saved");
+    }
   } catch (cause) {
     if (request === controller)
       error.value =
