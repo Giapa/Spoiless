@@ -1,4 +1,4 @@
-from spoiless.citations import validate_answer
+from spoiless.book_assistant.citations import validate_answer
 from spoiless.retrieval import Passage
 
 
@@ -25,7 +25,7 @@ def test_valid_citation_resolves_to_the_exact_retrieved_passage():
 def test_citations_cannot_point_to_unretrieved_passages():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     passages = [Passage(0, 0, "Read passage"), Passage(1, 0, "Another passage")]
     with pytest.raises(CitationValidationError):
@@ -38,7 +38,7 @@ def test_citations_cannot_point_to_unretrieved_passages():
 def test_fabricated_quote_is_rejected_without_leaking_answer():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     with pytest.raises(CitationValidationError) as error:
         validate_answer(
@@ -53,7 +53,7 @@ def test_fabricated_quote_is_rejected_without_leaking_answer():
 def test_uncited_answers_are_withheld():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     with pytest.raises(CitationValidationError):
         validate_answer(
@@ -65,7 +65,7 @@ def test_uncited_answers_are_withheld():
 def test_blank_quotes_cannot_be_used_as_evidence():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     for quote in ("", " "):
         import json
@@ -80,7 +80,7 @@ def test_blank_quotes_cannot_be_used_as_evidence():
 def test_malformed_response_is_rejected_without_exposing_its_contents():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     with pytest.raises(CitationValidationError) as error:
         validate_answer(
@@ -107,7 +107,7 @@ def test_citation_offset_uses_unicode_characters():
 def test_blank_answer_is_not_returned():
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     with pytest.raises(CitationValidationError):
         validate_answer(
@@ -121,7 +121,7 @@ def test_invalid_passage_ids_and_mixed_validity_withhold_whole_answer():
 
     import pytest
 
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     passages = [Passage(0, 0, "A known passage")]
     for wrong in (1, True, "0"):

@@ -17,7 +17,7 @@ uv run uvicorn spoiless.main:app --reload
 
 The health endpoint is available at `http://127.0.0.1:8000/api/health`.
 
-The backend API starts in `src/spoiless/main.py`. ChatGPT sign-in, credentials, accounts, model discovery, and inference are grouped in `src/spoiless/chatgpt/`.
+The backend API starts in `src/spoiless/main.py`. ChatGPT sign-in, credentials, accounts, model discovery, and inference are grouped in `src/spoiless/chatgpt/`. Book questions, recaps, and citation validation are grouped in `src/spoiless/book_assistant/`.
 
 ```sh
 uv run pytest

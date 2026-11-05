@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from spoiless import library
-from spoiless.book_answers import answer_book_question
+from spoiless.book_assistant.questions import answer_book_question
 from spoiless.chatgpt import accounts as chatgpt_accounts
 from spoiless.chatgpt import credentials as chatgpt_credentials
 from spoiless.chatgpt.auth import VerifiedIdentity
@@ -251,7 +251,7 @@ def test_chapter_map_change_with_same_eligible_text_withholds_answer(
 
 
 def test_fabricated_citation_withholds_the_entire_answer(reading_setup, monkeypatch):
-    from spoiless.citations import CitationValidationError
+    from spoiless.book_assistant.citations import CitationValidationError
 
     book, account = reading_setup
 

@@ -8,10 +8,10 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from spoiless import library
+from spoiless.book_assistant.citations import ValidatedAnswer
 from spoiless.chatgpt.accounts import AccountError, list_accounts
 from spoiless.chatgpt.credentials import CredentialStoreError
 from spoiless.chatgpt.session import SignInBusy, SignInManager, SignInStartError
-from spoiless.citations import ValidatedAnswer
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
 
 app = FastAPI(title="Spoiless")
@@ -469,11 +469,11 @@ def _run_book_generation(
     confirm: bool,
     generate: Callable[[str], ValidatedAnswer],
 ) -> AnswerResponse:
+    from spoiless.book_assistant.citations import CitationValidationError
     from spoiless.chatgpt.accounts import active_account
     from spoiless.chatgpt.exchange import ExchangeError
     from spoiless.chatgpt.inference import InferenceError
     from spoiless.chatgpt.models import ModelCatalogError
-    from spoiless.citations import CitationValidationError
     from spoiless.retrieval import ProgressChanged
 
     _local_request(request, mutation=True)
@@ -549,7 +549,7 @@ class RecapRequest(BaseModel):
 def answer_book(
     book_id: str, request: Request, response: Response, action: AnswerRequest
 ) -> AnswerResponse:
-    from spoiless.book_answers import answer_book_question
+    from spoiless.book_assistant.questions import answer_book_question
 
     return _run_book_generation(
         request,
@@ -565,7 +565,7 @@ def answer_book(
 def recap_book(
     book_id: str, request: Request, response: Response, action: RecapRequest
 ) -> AnswerResponse:
-    from spoiless.recaps import recap_chapter
+    from spoiless.book_assistant.recaps import recap_chapter
 
     return _run_book_generation(
         request,

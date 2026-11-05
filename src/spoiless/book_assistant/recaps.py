@@ -3,8 +3,12 @@
 import json
 from typing import Literal
 
+from spoiless.book_assistant.citations import (
+    CitationValidationError,
+    ValidatedAnswer,
+    validate_answer,
+)
 from spoiless.chatgpt.inference import generate_response
-from spoiless.citations import CitationValidationError, ValidatedAnswer, validate_answer
 from spoiless.library import connect, eligible_text, get_progress, get_reading_units
 from spoiless.retrieval import Passage, ProgressChanged, _check_snapshot
 
