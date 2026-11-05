@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from spoiless import embedding_model
+from spoiless.retrieval import embedding_model
 
 
 def test_model_download_requires_explicit_setup(tmp_path, monkeypatch):

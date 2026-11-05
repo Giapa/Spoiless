@@ -12,8 +12,10 @@ from io import BytesIO
 from unittest.mock import patch
 from zipfile import ZIP_STORED, ZipFile
 
-from spoiless import embedding_model, library, retrieval
+from spoiless import library
 from spoiless.epub import read_epub
+from spoiless.retrieval import embedding_model
+from spoiless.retrieval import search as retrieval
 
 # Original text written for this project, released under CC0-1.0.
 CHAPTERS = (

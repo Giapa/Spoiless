@@ -159,7 +159,7 @@ def test_model_can_decline_when_passage_lacks_an_answer(reading_setup, monkeypat
 
 
 def test_progress_change_during_generation_withholds_answer(reading_setup, monkeypatch):
-    from spoiless.retrieval import ProgressChanged
+    from spoiless.retrieval.search import ProgressChanged
 
     book, account = reading_setup
 
@@ -201,7 +201,7 @@ def test_progress_change_during_generation_withholds_answer(reading_setup, monke
 def test_chapter_map_change_with_same_eligible_text_withholds_answer(
     reading_setup, monkeypatch
 ):
-    from spoiless.retrieval import ProgressChanged
+    from spoiless.retrieval.search import ProgressChanged
 
     book, account = reading_setup
 
@@ -293,7 +293,7 @@ def test_fabricated_citation_withholds_the_entire_answer(reading_setup, monkeypa
 def test_progress_change_during_model_discovery_prevents_sending_book_text(
     reading_setup, monkeypatch
 ):
-    from spoiless.retrieval import ProgressChanged
+    from spoiless.retrieval.search import ProgressChanged
 
     book, account = reading_setup
     library.set_progress(book, 3)

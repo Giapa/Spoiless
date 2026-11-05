@@ -10,7 +10,7 @@ from spoiless.book_assistant.citations import (
 )
 from spoiless.chatgpt.inference import generate_response
 from spoiless.library import connect, eligible_text, get_progress, get_reading_units
-from spoiless.retrieval import Passage, ProgressChanged, _check_snapshot
+from spoiless.retrieval.search import Passage, ProgressChanged, _check_snapshot
 
 
 def recap_chapter(

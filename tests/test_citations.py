@@ -1,5 +1,5 @@
 from spoiless.book_assistant.citations import validate_answer
-from spoiless.retrieval import Passage
+from spoiless.retrieval.search import Passage
 
 
 def test_valid_citation_resolves_to_the_exact_retrieved_passage():

@@ -3,8 +3,8 @@ import pytest
 from spoiless import library
 from spoiless.epub import Book, Section
 from spoiless.main import KeywordSearchRequest, keyword_search
-from spoiless.retrieval import PASSAGE_CHARS
-from spoiless.retrieval import keyword_search as search
+from spoiless.retrieval.search import PASSAGE_CHARS
+from spoiless.retrieval.search import keyword_search as search
 
 
 def test_search_indexes_only_eligible_text(tmp_path, monkeypatch):

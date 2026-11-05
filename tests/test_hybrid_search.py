@@ -1,10 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from spoiless import embedding_model, library
+from spoiless import library
 from spoiless.epub import Book, Section
 from spoiless.main import app
-from spoiless.retrieval import ModelUnavailable, ProgressChanged, hybrid_search
+from spoiless.retrieval import embedding_model
+from spoiless.retrieval.search import ModelUnavailable, ProgressChanged, hybrid_search
 
 
 @pytest.fixture

@@ -89,14 +89,14 @@ def keyword_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
 
 def hybrid_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
     """Combine keyword and semantic rankings for eligible passages."""
-    from spoiless.embedding_model import load_model
+    from spoiless.retrieval.embedding_model import load_model
 
     words = _validate_query(query, limit)
     snapshot = eligible_text(book_id)
     passages = _passages(snapshot)
     if not passages:
         return []
-    from spoiless.embedding_model import model_revision
+    from spoiless.retrieval.embedding_model import model_revision
 
     revision = model_revision()
     # Only look up entries for passages already clipped to the current boundary.

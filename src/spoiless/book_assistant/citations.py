@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from spoiless.retrieval import Passage
+from spoiless.retrieval.search import Passage
 
 
 class CitationValidationError(Exception):

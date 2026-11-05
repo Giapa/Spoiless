@@ -6,7 +6,7 @@ from pathlib import Path
 
 from scripts.evaluate_retrieval import CHAPTERS, _safe_results, sample_epub
 from spoiless.epub import read_epub
-from spoiless.retrieval import Passage
+from spoiless.retrieval.search import Passage
 
 
 def test_sample_epub_and_independent_boundary_check():

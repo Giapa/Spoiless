@@ -187,8 +187,8 @@ class PassageResponse(BaseModel):
 def keyword_search(
     book_id: str, request: KeywordSearchRequest
 ) -> list[PassageResponse]:
-    from spoiless.retrieval import ProgressChanged
-    from spoiless.retrieval import keyword_search as search
+    from spoiless.retrieval.search import ProgressChanged
+    from spoiless.retrieval.search import keyword_search as search
 
     try:
         return [
@@ -213,14 +213,14 @@ class ModelSetupRequest(BaseModel):
 
 @app.get("/api/semantic-model", response_model=ModelStatus)
 def semantic_model_status() -> ModelStatus:
-    from spoiless.embedding_model import model_ready
+    from spoiless.retrieval.embedding_model import model_ready
 
     return ModelStatus(ready=model_ready())
 
 
 @app.post("/api/semantic-model", response_model=ModelStatus)
 def setup_semantic_model(request: ModelSetupRequest) -> ModelStatus:
-    from spoiless.embedding_model import setup_model
+    from spoiless.retrieval.embedding_model import setup_model
 
     try:
         setup_model()
@@ -233,8 +233,8 @@ def setup_semantic_model(request: ModelSetupRequest) -> ModelStatus:
 
 @app.post("/api/books/{book_id}/hybrid-search", response_model=list[PassageResponse])
 def hybrid_search(book_id: str, request: KeywordSearchRequest) -> list[PassageResponse]:
-    from spoiless.retrieval import ModelUnavailable, ProgressChanged
-    from spoiless.retrieval import hybrid_search as search
+    from spoiless.retrieval.search import ModelUnavailable, ProgressChanged
+    from spoiless.retrieval.search import hybrid_search as search
 
     try:
         return [
@@ -474,7 +474,7 @@ def _run_book_generation(
     from spoiless.chatgpt.exchange import ExchangeError
     from spoiless.chatgpt.inference import InferenceError
     from spoiless.chatgpt.models import ModelCatalogError
-    from spoiless.retrieval import ProgressChanged
+    from spoiless.retrieval.search import ProgressChanged
 
     _local_request(request, mutation=True)
     if not confirm:
