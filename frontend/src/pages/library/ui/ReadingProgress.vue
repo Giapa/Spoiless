@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string }>();
-const emit = defineEmits<{ availability: [ready: boolean] }>();
+const emit = defineEmits<{ availability: [ready: boolean]; completed: [count: number] }>();
 const schema = z.object({
   chapter_count: z.number().int().nonnegative(),
   current_chapter: z.number().int().nullable(),
@@ -30,6 +30,7 @@ async function load() {
     if (version !== loadVersion) return;
     progress.value = updated;
     choice.value = progress.value.current_chapter?.toString() ?? "";
+    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
     emit("availability", progress.value.current_chapter !== null);
   } catch {
     if (version !== loadVersion) return;
@@ -56,6 +57,7 @@ async function save() {
     if (!response.ok) throw new Error();
     progress.value = schema.parse(await response.json());
     notice.value = "Reading progress saved.";
+    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
     emit("availability", progress.value.current_chapter !== null);
   } catch {
     error.value = "Could not save reading progress. Try again.";

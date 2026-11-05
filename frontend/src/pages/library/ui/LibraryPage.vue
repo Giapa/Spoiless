@@ -38,7 +38,7 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
     <ChatGPTConnection @account-changing="accountVersion++" />
     <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />
     <SemanticModelSetup />
-    <p class="footnote">Recaps are coming in a later task.</p>
+    <p class="footnote">Cumulative recaps are coming in a later task.</p>
   </main>
 </template>
 

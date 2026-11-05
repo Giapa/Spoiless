@@ -125,7 +125,7 @@ test("a question cannot be sent until a model is selected", async () => {
     await page.getByText("Ask about completed chapters").click();
     await page.getByRole("textbox", { name: "Your question" }).fill("Who found the key?");
     assert.equal(await page.getByRole("button", { name: "Ask" }).isDisabled(), true);
-    await page.getByText(/choose a ChatGPT model/i).waitFor();
+    await page.getByText("Choose a ChatGPT model below to ask a question.").waitFor();
   } finally { await browser.close(); }
 });
 

@@ -3,12 +3,14 @@ import { reactive } from "vue";
 import PassageSearch from "./PassageSearch.vue";
 import BookQuestion from "./BookQuestion.vue";
 import ConversationHistory from "./ConversationHistory.vue";
+import BookRecap from "./BookRecap.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
 
 defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string; model: string }>();
 const searchAvailable = reactive<Record<string, boolean>>({});
 const historyVersion = reactive<Record<string, number>>({});
+const completedChapters = reactive<Record<string, number>>({});
 defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
 </script>
 
@@ -35,8 +37,15 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
             v-if="book.chapters_confirmed"
             :book-id="book.id"
             @availability="searchAvailable[book.id] = $event"
+            @completed="completedChapters[book.id] = $event"
           />
           <PassageSearch v-if="searchAvailable[book.id]" :book-id="book.id" />
+          <BookRecap
+            v-if="searchAvailable[book.id]"
+            :book-id="book.id"
+            :model="model"
+            :completed="completedChapters[book.id] ?? 0"
+          />
           <BookQuestion
             v-if="searchAvailable[book.id]"
             :book-id="book.id"

@@ -108,9 +108,9 @@ def fake_openai(self, request):
     ):
         body = json.loads(request.content)
         prompt = body["input"][0]["content"]
-        if (
-            "UNREAD_SECRET" in prompt and body["model"] != "a3"
-        ) or "Mira found the key" not in prompt:
+        if body["model"] != "a3" and (
+            "UNREAD_SECRET" in prompt or "Mira found the key" not in prompt
+        ):
             return httpx.Response(400)
         if body["model"] == "a4":
             answer = json.dumps(
