@@ -4,6 +4,7 @@ import { z } from "zod";
 
 const props = defineProps<{ bookId: string; model: string; completed: number }>();
 const chapter = ref("");
+const mode = ref<"chapter" | "through">("chapter");
 const busy = ref(false);
 const error = ref("");
 const schema = z.object({
@@ -36,7 +37,12 @@ async function generate() {
     const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/recap`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
-      body: JSON.stringify({ chapter: Number(chapter.value), model: props.model, confirm: true }),
+      body: JSON.stringify({
+        chapter: Number(chapter.value),
+        mode: mode.value,
+        model: props.model,
+        confirm: true,
+      }),
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -79,9 +85,38 @@ onBeforeUnmount(() => {
   <details class="recap" @toggle="clear">
     <summary>Recap a completed chapter</summary>
     <form @submit.prevent="generate">
-      <p>The selected chapter is sent to OpenAI. AI recaps may contain spoilers.</p>
+      <fieldset>
+        <legend>Recap scope</legend>
+        <label
+          ><input
+            v-model="mode"
+            type="radio"
+            :name="`recap-mode-${bookId}`"
+            value="chapter"
+            @change="clear"
+          />
+          Only this chapter</label
+        >
+        <label
+          ><input
+            v-model="mode"
+            type="radio"
+            :name="`recap-mode-${bookId}`"
+            value="through"
+            @change="clear"
+          />
+          From the beginning through this chapter</label
+        >
+      </fieldset>
+      <p v-if="mode === 'chapter'">
+        The selected chapter is sent to OpenAI. AI recaps may contain spoilers.
+      </p>
+      <p v-else>
+        Confirmed front matter and all chapters through the selected chapter are sent to OpenAI. AI
+        recaps may contain spoilers.
+      </p>
       <p>
-        Recaps are not saved and clear when you leave this window. Chapters over 24,000 characters
+        Recaps are not saved and clear when you leave this window. Selections over 24,000 characters
         cannot be recapped yet.
       </p>
       <p v-if="model">
@@ -137,6 +172,22 @@ form {
 label {
   font-size: 14px;
   font-weight: 600;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+legend {
+  font-size: 14px;
+  font-weight: 600;
+}
+fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-weight: 400;
 }
 select,
 button {

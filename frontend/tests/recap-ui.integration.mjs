@@ -58,6 +58,27 @@ test("reader recaps a completed chapter and sees a citation", async () => {
   } finally { await browser.close(); }
 });
 
+test("reader can recap through a completed chapter", async () => {
+  const { browser, page } = await openApp();
+  try {
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    await page.getByText("Recap a completed chapter", { exact: true }).click();
+    await page.getByRole("combobox", { name: "Chapter to recap" }).selectOption("1");
+    await page.getByRole("radio", { name: "From the beginning through this chapter" }).check();
+    await page.getByText(/confirmed front matter and all chapters through the selected chapter.*sent to OpenAI/i).waitFor();
+    const sent = page.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/recap"));
+    await page.getByRole("button", { name: "Create recap" }).click();
+    assert.equal((await sent).postDataJSON().mode, "through");
+    const recap = page.getByRole("region", { name: "Recap" });
+    await recap.getByText("Mira found the key.").waitFor();
+    await recap.getByText("found the key", { exact: true }).waitFor();
+    assert.equal((await page.locator("body").innerText()).includes("UNREAD_SECRET"), false);
+    await page.getByRole("radio", { name: "Only this chapter" }).check();
+    await recap.waitFor({ state: "hidden" });
+  } finally { await browser.close(); }
+});
+
 test("moving backward withholds an in-flight recap", async () => {
   const { browser, page } = await openApp();
   try {
@@ -68,6 +89,7 @@ test("moving backward withholds an in-flight recap", async () => {
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a3");
     await page.getByText("Recap a completed chapter", { exact: true }).click();
+    await page.getByRole("radio", { name: "From the beginning through this chapter" }).check();
     await page.getByRole("combobox", { name: "Chapter to recap" }).selectOption("2");
     await page.getByRole("button", { name: "Create recap" }).click();
     await page.waitForFunction(async () => (await (await fetch("/__test__/question_started")).json()).started);
@@ -130,5 +152,27 @@ test("leaving the window clears a completed recap", async () => {
     await recap.getByText("Mira found the key.").waitFor();
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
     await recap.waitFor({ state: "hidden" });
+  } finally { await browser.close(); }
+});
+
+test("switching recap scope clears a pending result", async () => {
+  const { browser, page } = await openApp();
+  try {
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    await progress.selectOption({ label: "Finished book" });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a3");
+    await page.getByText("Recap a completed chapter", { exact: true }).click();
+    await page.getByRole("combobox", { name: "Chapter to recap" }).selectOption("2");
+    await page.getByRole("radio", { name: "From the beginning through this chapter" }).check();
+    const sent = page.waitForRequest((request) => request.method() === "POST" && new URL(request.url()).pathname.endsWith("/recap"));
+    await page.getByRole("button", { name: "Create recap" }).click();
+    await sent;
+    await page.getByRole("radio", { name: "Only this chapter" }).check();
+    await page.waitForTimeout(1800);
+    assert.equal(await page.getByRole("region", { name: "Recap" }).count(), 0);
+    assert.equal((await page.locator("body").innerText()).includes("UNREAD_SECRET"), false);
   } finally { await browser.close(); }
 });

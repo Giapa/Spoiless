@@ -38,7 +38,6 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
     <ChatGPTConnection @account-changing="accountVersion++" />
     <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />
     <SemanticModelSetup />
-    <p class="footnote">Cumulative recaps are coming in a later task.</p>
   </main>
 </template>
 
@@ -64,8 +63,7 @@ h1 {
   font-weight: 650;
 }
 .intro p,
-.hint,
-.footnote {
+.hint {
   color: #555;
 }
 .intro p {
@@ -83,10 +81,6 @@ h1 {
 }
 .error {
   border-color: #ac2525;
-}
-.footnote {
-  font-size: 14px;
-  margin-top: 24px;
 }
 @media (max-width: 600px) {
   main {
