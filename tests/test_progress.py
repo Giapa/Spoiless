@@ -4,8 +4,8 @@ from pydantic import ValidationError
 
 from spoiless.database import connect
 from spoiless.library import storage as library
+from spoiless.library.api import ProgressRequest, reading_progress, update_progress
 from spoiless.library.epub import Book, Section
-from spoiless.main import ProgressRequest, reading_progress, update_progress
 
 
 def test_progress_boundary_and_reconfirmation(tmp_path, monkeypatch):

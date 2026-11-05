@@ -43,7 +43,7 @@ def test_invalid_upload_leaves_no_book(client):
 
 
 def test_oversized_upload_is_rejected(client, monkeypatch):
-    monkeypatch.setattr("spoiless.main.MAX_ARCHIVE_BYTES", 4)
+    monkeypatch.setattr("spoiless.library.api.MAX_ARCHIVE_BYTES", 4)
     response = client.post(
         "/api/books", content=b"12345", headers={"content-type": "application/epub+zip"}
     )
