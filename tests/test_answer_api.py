@@ -67,6 +67,7 @@ def test_answer_api_returns_verified_text_without_unread_material(
 ):
     book, _ = reading_setup
     requests = []
+    question = "Who found the key {κλειδί}?"
 
     def handle(request):
         requests.append(request)
@@ -105,13 +106,13 @@ def test_answer_api_returns_verified_text_without_unread_material(
     ) as client:
         response = client.post(
             f"/api/books/{book}/answer",
-            json={"question": "Who found the key?", "model": "model", "confirm": True},
+            json={"question": question, "model": "model", "confirm": True},
             headers=headers,
         )
         history = client.get(f"/api/books/{book}/conversation")
     assert response.status_code == 200
     assert history.status_code == 200
-    assert history.json() == [{"question": "Who found the key?", **response.json()}]
+    assert history.json() == [{"question": question, **response.json()}]
     assert response.json() == {
         "answer": "Mira found the key.",
         "citations": [
@@ -122,6 +123,14 @@ def test_answer_api_returns_verified_text_without_unread_material(
     assert "UNREAD_SECRET" not in response.text
     assert "secret-token" not in response.text
     assert "UNREAD_SECRET" not in requests[-1].content.decode()
+    prompt = json.loads(requests[-1].content)["input"][0]["content"]
+    instructions, payload = prompt.split("\n", 1)
+    assert '{"insufficient_evidence":true}' in instructions
+    assert json.loads(payload) == {
+        "question": question,
+        "conversation": [],
+        "passages": ["Mira found the key. "],
+    }
 
 
 def test_completed_chapter_recap_returns_citations_without_unread_text(
