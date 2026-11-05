@@ -4,13 +4,13 @@ import time
 import httpx
 import pytest
 
-from spoiless import library
 from spoiless.book_assistant.questions import answer_book_question
 from spoiless.chatgpt import accounts as chatgpt_accounts
 from spoiless.chatgpt import credentials as chatgpt_credentials
 from spoiless.chatgpt.auth import VerifiedIdentity
 from spoiless.chatgpt.credentials import CredentialRecord
-from spoiless.epub import Book, Section
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
 
 
 class MemoryKeyring:

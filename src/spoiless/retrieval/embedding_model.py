@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from spoiless.library import database_path
+from spoiless.database import database_path
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 _lock = Lock()

@@ -6,7 +6,7 @@ from spoiless.chatgpt import accounts
 from spoiless.chatgpt import session as chatgpt_session
 from spoiless.chatgpt.auth import VerifiedIdentity
 from spoiless.chatgpt.credentials import CredentialRecord
-from spoiless.library import connect
+from spoiless.database import connect
 
 
 def record(client_id, subject, email="same@example.test"):

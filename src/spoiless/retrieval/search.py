@@ -7,7 +7,8 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
-from spoiless.library import connect, eligible_text
+from spoiless.database import connect
+from spoiless.library.storage import eligible_text
 
 # ponytail: rebuild the eligible keyword index per search; persist it if profiling
 # shows this is too slow, while preserving filtering before ranking.

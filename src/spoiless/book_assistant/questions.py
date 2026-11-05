@@ -5,7 +5,8 @@ from dataclasses import asdict
 
 from spoiless.book_assistant.citations import ValidatedAnswer, validate_answer
 from spoiless.chatgpt.inference import generate_response
-from spoiless.library import connect, eligible_text
+from spoiless.database import connect
+from spoiless.library.storage import eligible_text
 from spoiless.retrieval.search import ProgressChanged, _check_snapshot, keyword_search
 
 NO_EVIDENCE = "I couldn't find enough information in the completed chapters."

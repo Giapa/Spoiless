@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from spoiless import library
-from spoiless.epub import Book, Section
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
 from spoiless.main import app
 
 

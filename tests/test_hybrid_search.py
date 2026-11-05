@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from spoiless import library
-from spoiless.epub import Book, Section
+from spoiless.database import connect
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
 from spoiless.main import app
 from spoiless.retrieval import embedding_model
 from spoiless.retrieval.search import ModelUnavailable, ProgressChanged, hybrid_search
@@ -143,10 +144,10 @@ def test_embedding_cache_respects_progress_and_book_deletion(book_id, monkeypatc
         "The sailor found a compass."
     ]
     assert batches[-1] == ["ending"]
-    with library.connect() as db:
+    with connect() as db:
         assert db.execute("SELECT count(*) FROM passage_embeddings").fetchone()[0] == 2
     library.delete_book(book_id)
-    with library.connect() as db:
+    with connect() as db:
         assert db.execute("SELECT count(*) FROM passage_embeddings").fetchone()[0] == 0
 
 
@@ -179,7 +180,7 @@ def test_cache_invalidated_when_boundary_or_model_changes(tmp_path, monkeypatch)
     marker.write_text("a-new-model-version")
     hybrid_search(book, "query")
     assert batches[-1] == ["Known SECRET"]
-    with library.connect() as db, db:
+    with connect() as db, db:
         db.execute(
             "UPDATE passage_embeddings SET vector = 'not-json' WHERE book_id = ?",
             (book,),
@@ -200,5 +201,5 @@ def test_model_change_during_embedding_discards_result(book_id, monkeypatch):
     monkeypatch.setattr(embedding_model, "load_model", lambda: ChangingModel())
     with pytest.raises(ProgressChanged):
         hybrid_search(book_id, "compass")
-    with library.connect() as db:
+    with connect() as db:
         assert db.execute("SELECT count(*) FROM passage_embeddings").fetchone()[0] == 0

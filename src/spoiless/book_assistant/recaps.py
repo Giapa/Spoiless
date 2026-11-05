@@ -9,7 +9,8 @@ from spoiless.book_assistant.citations import (
     validate_answer,
 )
 from spoiless.chatgpt.inference import generate_response
-from spoiless.library import connect, eligible_text, get_progress, get_reading_units
+from spoiless.database import connect
+from spoiless.library.storage import eligible_text, get_progress, get_reading_units
 from spoiless.retrieval.search import Passage, ProgressChanged, _check_snapshot
 
 

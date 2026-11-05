@@ -8,12 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from scripts.evaluate_retrieval import CHAPTERS, QUESTIONS, sample_epub
-from spoiless import library
 from spoiless.chatgpt import accounts as chatgpt_accounts
 from spoiless.chatgpt import credentials as chatgpt_credentials
 from spoiless.chatgpt.auth import VerifiedIdentity
 from spoiless.chatgpt.credentials import CredentialRecord
-from spoiless.epub import read_epub
+from spoiless.library import storage as library
+from spoiless.library.epub import read_epub
 from spoiless.main import app
 
 ADVERSARIAL_QUESTIONS = (

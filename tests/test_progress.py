@@ -2,8 +2,9 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from spoiless import library
-from spoiless.epub import Book, Section
+from spoiless.database import connect
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
 from spoiless.main import ProgressRequest, reading_progress, update_progress
 
 
@@ -72,7 +73,7 @@ def test_one_chapter_and_independent_books(tmp_path, monkeypatch):
     assert library.eligible_text(first) == [(0, "Only chapter")]
     with pytest.raises(ValueError):
         library.eligible_text(second)
-    with library.connect() as db, db:
+    with connect() as db, db:
         db.execute(
             "UPDATE reading_progress SET current_chapter = 99 WHERE book_id = ?",
             (first,),

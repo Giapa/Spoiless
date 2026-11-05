@@ -47,7 +47,7 @@ from spoiless.chatgpt.exchange import (
     _json_request,
 )
 from spoiless.chatgpt.listener import LocalSignIn, Status
-from spoiless.library import database_path
+from spoiless.database import database_path
 
 
 class SignInBusy(Exception):

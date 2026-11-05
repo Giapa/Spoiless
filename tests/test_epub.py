@@ -3,7 +3,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from spoiless.epub import InvalidEpub, NavigationEntry, read_epub
+from spoiless.library.epub import InvalidEpub, NavigationEntry, read_epub
 
 
 def epub(*, href: str = "one.xhtml", extra: dict[str, str] | None = None) -> bytes:

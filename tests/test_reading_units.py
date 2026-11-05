@@ -2,9 +2,10 @@ import sqlite3
 
 import pytest
 
-from spoiless import library
-from spoiless.epub import Book, Section
-from spoiless.library import BookNotFound, ReadingUnitStart
+from spoiless.database import database_path
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
+from spoiless.library.storage import BookNotFound, ReadingUnitStart
 
 
 @pytest.fixture
@@ -52,7 +53,7 @@ def test_invalid_boundaries_preserve_existing_confirmation(book_id, units):
 def test_deleting_book_removes_confirmed_units(book_id):
     library.confirm_reading_units(book_id, [ReadingUnitStart("chapter", 0, 0)])
     assert library.delete_book(book_id)
-    with sqlite3.connect(library.database_path()) as db:
+    with sqlite3.connect(database_path()) as db:
         assert db.execute("SELECT COUNT(*) FROM reading_units").fetchone()[0] == 0
     with pytest.raises(BookNotFound):
         library.get_reading_units(book_id)

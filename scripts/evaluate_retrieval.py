@@ -12,8 +12,8 @@ from io import BytesIO
 from unittest.mock import patch
 from zipfile import ZIP_STORED, ZipFile
 
-from spoiless import library
-from spoiless.epub import read_epub
+from spoiless.library import storage as library
+from spoiless.library.epub import read_epub
 from spoiless.retrieval import embedding_model
 from spoiless.retrieval import search as retrieval
 

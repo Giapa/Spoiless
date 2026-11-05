@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from spoiless.chatgpt.auth import DYNAMIC_CLIENT, VerifiedIdentity, _client_id
 from spoiless.chatgpt.credentials import load_credentials
-from spoiless.library import connect
+from spoiless.database import connect
 
 
 class AccountError(Exception):

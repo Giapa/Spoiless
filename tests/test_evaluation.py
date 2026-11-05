@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from scripts.evaluate_retrieval import CHAPTERS, _safe_results, sample_epub
-from spoiless.epub import read_epub
+from spoiless.library.epub import read_epub
 from spoiless.retrieval.search import Passage
 
 

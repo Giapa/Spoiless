@@ -7,12 +7,13 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from spoiless import library
 from spoiless.book_assistant.citations import ValidatedAnswer
 from spoiless.chatgpt.accounts import AccountError, list_accounts
 from spoiless.chatgpt.credentials import CredentialStoreError
 from spoiless.chatgpt.session import SignInBusy, SignInManager, SignInStartError
-from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
+from spoiless.database import connect
+from spoiless.library import storage as library
+from spoiless.library.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
 
 app = FastAPI(title="Spoiless")
 _sign_in = SignInManager()
@@ -439,7 +440,7 @@ def conversation(
     import json
 
     _local_request(request)
-    with library.connect() as db:
+    with connect() as db:
         db.execute("BEGIN")
         try:
             progress = library._progress(db, book_id)
@@ -599,7 +600,7 @@ def chatgpt_models(
     if not action.confirm:
         raise HTTPException(422, "Confirmation is required.")
     # ponytail: any database write invalidates lookup; narrow per account if needed.
-    with library.connect() as observer:
+    with connect() as observer:
         version = observer.execute("PRAGMA data_version").fetchone()[0]
         account = active_account()
         if account is None:

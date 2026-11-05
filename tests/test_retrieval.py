@@ -1,7 +1,7 @@
 import pytest
 
-from spoiless import library
-from spoiless.epub import Book, Section
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, Section
 from spoiless.main import KeywordSearchRequest, keyword_search
 from spoiless.retrieval.search import PASSAGE_CHARS
 from spoiless.retrieval.search import keyword_search as search

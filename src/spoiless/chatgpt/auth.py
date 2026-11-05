@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import jwt
 
-from spoiless.library import connect
+from spoiless.database import connect
 
 ISSUER = "https://auth.openai.com"
 AUTHORIZE_URL = f"{ISSUER}/api/accounts/authorize"

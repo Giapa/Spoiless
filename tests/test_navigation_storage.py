@@ -4,8 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 from test_epub import epub
 
-from spoiless import library
-from spoiless.epub import Book, NavigationEntry, Section
+from spoiless.database import database_path
+from spoiless.library import storage as library
+from spoiless.library.epub import Book, NavigationEntry, Section
 from spoiless.main import app
 
 
@@ -49,7 +50,7 @@ def test_import_persists_unconfirmed_suggestions_without_exposing_titles(client)
     assert client.get(f"/api/books/{book_id}/reading-units").json() == []
     assert client.get("/api/books").json()[0]["chapters_confirmed"] is False
     assert client.delete(f"/api/books/{book_id}").status_code == 204
-    with sqlite3.connect(library.database_path()) as db:
+    with sqlite3.connect(database_path()) as db:
         assert db.execute("SELECT COUNT(*) FROM navigation_entries").fetchone()[0] == 0
     assert client.get(endpoint).status_code == 404
 
@@ -69,7 +70,7 @@ def test_invalid_navigation_rolls_back_entire_import(client):
 
 def test_existing_database_gets_navigation_table(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
-    path = library.database_path()
+    path = database_path()
     path.parent.mkdir(parents=True)
     with sqlite3.connect(path) as db:
         db.executescript("""
