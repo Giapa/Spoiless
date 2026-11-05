@@ -1,8 +1,9 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from spoiless.library import storage as library
 from spoiless.library.epub import Book, Section
-from spoiless.main import KeywordSearchRequest, keyword_search
+from spoiless.main import app
 from spoiless.retrieval.search import PASSAGE_CHARS
 from spoiless.retrieval.search import keyword_search as search
 
@@ -29,10 +30,12 @@ def test_search_indexes_only_eligible_text(tmp_path, monkeypatch):
     assert len(result) == 1
     assert result[0].character_offset == 0
     assert "secretending" not in result[0].text
-    assert (
-        keyword_search(book, KeywordSearchRequest(query="key"))[0].text
-        == result[0].text
-    )
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/books/{book}/keyword-search", json={"query": "key"}
+        )
+    assert response.status_code == 200
+    assert response.json()[0]["text"] == result[0].text
     library.set_progress(book, 4)
     assert search(book, "revelation")[0].section_position == 1
     assert search(book, "secretending")[0].text.endswith("secretending")
