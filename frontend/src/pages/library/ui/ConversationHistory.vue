@@ -77,8 +77,8 @@ onBeforeUnmount(() => {
     <summary>Conversation history</summary>
     <section aria-label="Conversation history">
       <p>
-        Previous questions and answers are stored on this device. Previous turns are not sent with
-        new questions. Moving backward starts a new conversation.
+        Questions and answers are stored on this device. Recent turns may be sent to OpenAI with new
+        questions. Moving backward starts a new conversation.
       </p>
       <p v-if="loading" role="status">Loading conversation…</p>
       <p v-else-if="error" role="alert">

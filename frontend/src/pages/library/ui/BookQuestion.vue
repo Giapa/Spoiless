@@ -85,8 +85,8 @@ onBeforeUnmount(() => {
     <summary>Ask about completed chapters</summary>
     <form @submit.prevent="ask">
       <p>
-        Your question and relevant passages from completed chapters are sent to OpenAI. AI answers
-        may contain spoilers.
+        Your question and relevant passages from completed chapters are sent to OpenAI. Recent
+        questions and answers may also be sent to OpenAI. AI answers may contain spoilers.
       </p>
       <p>
         Questions and answers are saved on this device. The displayed answer clears when you leave

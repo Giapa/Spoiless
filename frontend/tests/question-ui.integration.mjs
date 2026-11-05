@@ -49,6 +49,7 @@ test("reader asks a question and sees a verified citation", async () => {
     await page.getByText("Ask about completed chapters").click();
     await page.getByRole("textbox", { name: "Your question" }).fill("Who found the key?");
     assert.match(await page.locator("body").innerText(), /passages.*sent to OpenAI/i);
+    assert.match(await page.locator("body").innerText(), /recent questions and answers.*sent to OpenAI/i);
     await page.getByRole("button", { name: "Ask" }).click();
     await page.getByText("Mira found the key.").waitFor();
     assert.match(await page.locator("body").innerText(), /found the key/);
