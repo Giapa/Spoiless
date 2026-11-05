@@ -7,6 +7,8 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from spoiless.database import connect
 from spoiless.library.storage import eligible_text
 
@@ -23,19 +25,24 @@ class Passage:
 
 
 def _passages(sections: list[tuple[int, str]]) -> list[Passage]:
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=PASSAGE_CHARS,
+        chunk_overlap=0,
+        keep_separator="end",
+        strip_whitespace=False,
+        add_start_index=True,
+    )
     passages = []
     for position, text in sections:
-        start = 0
-        while start < len(text):
-            end = min(start + PASSAGE_CHARS, len(text))
-            if end < len(text) and not text[end].isspace():
-                space = max(text.rfind(char, start + 1, end) for char in " \t\r\n")
-                if space > start:
-                    end = space
-            passage = text[start:end]
-            if passage.strip():
-                passages.append(Passage(position, start, passage))
-            start = end
+        previous_end = 0
+        for document in splitter.create_documents([text]):
+            start = document.metadata["start_index"]
+            content = document.page_content
+            if start < previous_end or text[start : start + len(content)] != content:
+                raise ValueError("Could not determine passage location.")
+            previous_end = start + len(content)
+            if content.strip():
+                passages.append(Passage(position, start, content))
     return passages
 
 
