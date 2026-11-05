@@ -8,9 +8,9 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from spoiless import library
-from spoiless.chatgpt_accounts import AccountError, list_accounts
-from spoiless.chatgpt_credentials import CredentialStoreError
-from spoiless.chatgpt_session import SignInBusy, SignInManager, SignInStartError
+from spoiless.chatgpt.accounts import AccountError, list_accounts
+from spoiless.chatgpt.credentials import CredentialStoreError
+from spoiless.chatgpt.session import SignInBusy, SignInManager, SignInStartError
 from spoiless.citations import ValidatedAnswer
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
 
@@ -469,10 +469,10 @@ def _run_book_generation(
     confirm: bool,
     generate: Callable[[str], ValidatedAnswer],
 ) -> AnswerResponse:
-    from spoiless.chatgpt_accounts import active_account
-    from spoiless.chatgpt_exchange import ExchangeError
-    from spoiless.chatgpt_inference import InferenceError
-    from spoiless.chatgpt_models import ModelCatalogError
+    from spoiless.chatgpt.accounts import active_account
+    from spoiless.chatgpt.exchange import ExchangeError
+    from spoiless.chatgpt.inference import InferenceError
+    from spoiless.chatgpt.models import ModelCatalogError
     from spoiless.citations import CitationValidationError
     from spoiless.retrieval import ProgressChanged
 
@@ -591,9 +591,9 @@ class ChatGPTModel(BaseModel):
 def chatgpt_models(
     request: Request, response: Response, action: ModelListAction
 ) -> list[ChatGPTModel]:
-    from spoiless.chatgpt_accounts import active_account
-    from spoiless.chatgpt_exchange import ExchangeError
-    from spoiless.chatgpt_models import ModelCatalogError, list_available_models
+    from spoiless.chatgpt.accounts import active_account
+    from spoiless.chatgpt.exchange import ExchangeError
+    from spoiless.chatgpt.models import ModelCatalogError, list_available_models
 
     _local_request(request, mutation=True)
     if not action.confirm:

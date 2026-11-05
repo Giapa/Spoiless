@@ -3,9 +3,9 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 import httpx
 import pytest
 
-from spoiless import chatgpt_listener as listener
-from spoiless.chatgpt_auth import AuthorizationDenied, VerifiedIdentity
-from spoiless.chatgpt_exchange import ConnectedAccount
+from spoiless.chatgpt import listener
+from spoiless.chatgpt.auth import AuthorizationDenied, VerifiedIdentity
+from spoiless.chatgpt.exchange import ConnectedAccount
 
 
 @pytest.fixture
@@ -138,7 +138,7 @@ def test_listener_and_exchange_work_together_without_real_account(
     import jwt
     from cryptography.hazmat.primitives.asymmetric import rsa
 
-    from spoiless import chatgpt_exchange as exchange
+    from spoiless.chatgpt import exchange
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     jwk = jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key(), as_dict=True)

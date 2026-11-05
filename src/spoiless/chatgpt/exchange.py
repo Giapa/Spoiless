@@ -14,8 +14,8 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from spoiless.chatgpt_accounts import activate_after_storage, remember_verified
-from spoiless.chatgpt_auth import (
+from spoiless.chatgpt.accounts import activate_after_storage, remember_verified
+from spoiless.chatgpt.auth import (
     ISSUER,
     RESOURCE,
     AuthorizationAttempt,
@@ -24,7 +24,7 @@ from spoiless.chatgpt_auth import (
     has_plan_permission,
     verify_identity,
 )
-from spoiless.chatgpt_credentials import (
+from spoiless.chatgpt.credentials import (
     CredentialRecord,
     CredentialStoreError,
     load_credentials,

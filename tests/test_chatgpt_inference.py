@@ -3,10 +3,11 @@ import time
 import httpx
 import pytest
 
-from spoiless import chatgpt_accounts, chatgpt_credentials
-from spoiless.chatgpt_auth import VerifiedIdentity
-from spoiless.chatgpt_credentials import CredentialRecord
-from spoiless.chatgpt_inference import generate_response
+from spoiless.chatgpt import accounts as chatgpt_accounts
+from spoiless.chatgpt import credentials as chatgpt_credentials
+from spoiless.chatgpt.auth import VerifiedIdentity
+from spoiless.chatgpt.credentials import CredentialRecord
+from spoiless.chatgpt.inference import generate_response
 
 
 class MemoryKeyring:
@@ -97,7 +98,7 @@ def test_completed_response_returns_text_and_uses_account_plan(
 
 
 def test_failed_stream_never_returns_partial_text(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -140,7 +141,7 @@ def test_failed_stream_never_returns_partial_text(saved_account, monkeypatch):
 
 
 def test_http_errors_do_not_expose_prompts_or_tokens(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -207,7 +208,7 @@ def test_environment_cannot_redirect_access_token(saved_account, monkeypatch):
 
 
 def test_interrupted_stream_does_not_return_partial_output(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -241,7 +242,7 @@ def test_interrupted_stream_does_not_return_partial_output(saved_account, monkey
 
 
 def test_unavailable_model_never_sends_prompt(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     requests = []
 
@@ -269,7 +270,7 @@ def test_unavailable_model_never_sends_prompt(saved_account, monkeypatch):
 
 
 def test_malformed_stream_is_reported_as_a_safe_failure(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -307,7 +308,7 @@ def test_malformed_stream_is_reported_as_a_safe_failure(saved_account, monkeypat
 
 
 def test_plan_limit_error_is_available_for_recovery(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -343,7 +344,7 @@ def test_plan_limit_error_is_available_for_recovery(saved_account, monkeypatch):
 
 
 def test_invalid_event_json_does_not_leak_private_text(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":
@@ -425,7 +426,7 @@ def test_environment_cannot_override_account_token_or_inject_headers(
 
 
 def test_completed_event_must_contain_a_completed_response(saved_account, monkeypatch):
-    from spoiless.chatgpt_inference import InferenceError
+    from spoiless.chatgpt.inference import InferenceError
 
     def handle(request):
         if request.method == "GET":

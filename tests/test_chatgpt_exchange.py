@@ -7,8 +7,8 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from spoiless import chatgpt_exchange as exchange
-from spoiless.chatgpt_auth import AuthorizationAttempt, InvalidAuthorization
+from spoiless.chatgpt import exchange
+from spoiless.chatgpt.auth import AuthorizationAttempt, InvalidAuthorization
 
 
 @pytest.fixture
@@ -89,7 +89,7 @@ def test_exchange_saves_only_after_openai_signature_verification(fixture, monkey
     wire(monkeypatch, handler)
     account = exchange.exchange_and_store(attempt, callback(attempt))
     assert len(requests) == 2 and len(saved) == 1
-    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt import accounts
 
     assert accounts.active_account().client_id == account.client_id
     assert account.client_id == "oaiapp_123" and account.plan_usage_enabled
@@ -164,7 +164,7 @@ def test_invalid_identity_or_key_never_reaches_storage(fixture, monkeypatch, fai
     with pytest.raises((exchange.ExchangeError, InvalidAuthorization)):
         exchange.exchange_and_store(attempt, callback(attempt))
     assert not saved
-    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt import accounts
 
     assert accounts.list_accounts() == []
 
@@ -257,7 +257,7 @@ def test_untrusted_header_key_url_is_never_requested(fixture, monkeypatch):
 
 
 def test_store_failure_does_not_report_connected(fixture, monkeypatch):
-    from spoiless.chatgpt_credentials import CredentialStoreError
+    from spoiless.chatgpt.credentials import CredentialStoreError
 
     _, attempt, _, jwk, body, _ = fixture
     wire(
@@ -276,9 +276,9 @@ def test_store_failure_does_not_report_connected(fixture, monkeypatch):
 
 
 def test_failed_keyring_save_preserves_previous_active_account(fixture, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
-    from spoiless.chatgpt_auth import VerifiedIdentity
-    from spoiless.chatgpt_credentials import CredentialStoreError
+    from spoiless.chatgpt import accounts
+    from spoiless.chatgpt.auth import VerifiedIdentity
+    from spoiless.chatgpt.credentials import CredentialStoreError
 
     _, attempt, _, jwk, body, _ = fixture
     old = accounts.remember_verified(
@@ -312,7 +312,7 @@ def test_failed_keyring_save_preserves_previous_active_account(fixture, monkeypa
 def test_saved_credentials_can_be_recovered_after_activation_failure(
     fixture, monkeypatch
 ):
-    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt import accounts
 
     _, attempt, _, jwk, body, saved = fixture
     wire(
@@ -337,8 +337,8 @@ def test_saved_credentials_can_be_recovered_after_activation_failure(
 
 
 def test_existing_keyring_identity_mismatch_is_not_registered(fixture, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
-    from spoiless.chatgpt_credentials import CredentialStoreError
+    from spoiless.chatgpt import accounts
+    from spoiless.chatgpt.credentials import CredentialStoreError
 
     _, attempt, _, jwk, body, saved = fixture
     wire(
@@ -358,8 +358,8 @@ def test_existing_keyring_identity_mismatch_is_not_registered(fixture, monkeypat
 
 
 def test_returning_exchange_keeps_registered_account_and_subject(fixture, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
-    from spoiless.chatgpt_auth import VerifiedIdentity
+    from spoiless.chatgpt import accounts
+    from spoiless.chatgpt.auth import VerifiedIdentity
 
     key, _, claims, jwk, body, saved = fixture
     saved_id = accounts.remember_verified(

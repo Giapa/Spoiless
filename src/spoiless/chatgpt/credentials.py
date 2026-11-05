@@ -19,7 +19,7 @@ from pydantic import (
     model_validator,
 )
 
-from spoiless.chatgpt_auth import (
+from spoiless.chatgpt.auth import (
     DYNAMIC_CLIENT,
     VerifiedIdentity,
     _client_id,

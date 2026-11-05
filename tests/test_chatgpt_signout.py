@@ -5,9 +5,12 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from spoiless import chatgpt_accounts, chatgpt_credentials, chatgpt_session, main
-from spoiless.chatgpt_auth import VerifiedIdentity
-from spoiless.chatgpt_credentials import CredentialRecord
+from spoiless import main
+from spoiless.chatgpt import accounts as chatgpt_accounts
+from spoiless.chatgpt import credentials as chatgpt_credentials
+from spoiless.chatgpt import session as chatgpt_session
+from spoiless.chatgpt.auth import VerifiedIdentity
+from spoiless.chatgpt.credentials import CredentialRecord
 
 
 class MemoryKeyring:

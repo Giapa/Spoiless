@@ -7,10 +7,11 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from spoiless import chatgpt_session, main
-from spoiless.chatgpt_auth import VerifiedIdentity
-from spoiless.chatgpt_credentials import CredentialStoreError
-from spoiless.chatgpt_exchange import ConnectedAccount
+from spoiless import main
+from spoiless.chatgpt import session as chatgpt_session
+from spoiless.chatgpt.auth import VerifiedIdentity
+from spoiless.chatgpt.credentials import CredentialStoreError
+from spoiless.chatgpt.exchange import ConnectedAccount
 
 
 class FakeSignIn:
@@ -181,7 +182,7 @@ def test_attempt_lock_is_shared_between_processes(setup):
     manager.start()
     script = (
         "import os,sys\n"
-        "from spoiless.chatgpt_session import _acquire_attempt_lock,SignInBusy\n"
+        "from spoiless.chatgpt.session import _acquire_attempt_lock,SignInBusy\n"
         "\ntry: fd=_acquire_attempt_lock()\nexcept SignInBusy: sys.exit(9)\n"
         "os.close(fd)\n"
     )
@@ -242,8 +243,8 @@ def test_lock_rejects_symlink_without_touching_target(setup, tmp_path):
 
 
 def test_returning_signin_uses_only_selected_saved_identity(setup, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
-    from spoiless.chatgpt_credentials import CredentialRecord
+    from spoiless.chatgpt import accounts
+    from spoiless.chatgpt.credentials import CredentialRecord
 
     _, sessions = setup
     identity = VerifiedIdentity("selected-subject", "same@example.test")
@@ -280,7 +281,7 @@ def test_returning_signin_uses_only_selected_saved_identity(setup, monkeypatch):
 
 
 def test_returning_signin_without_keyring_record_and_unknown_id(setup, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt import accounts
 
     manager, sessions = setup
     identity = VerifiedIdentity("reader", None)
@@ -298,8 +299,8 @@ def test_returning_signin_without_keyring_record_and_unknown_id(setup, monkeypat
 
 
 def test_mismatched_stored_identity_never_opens_browser(setup, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
-    from spoiless.chatgpt_credentials import CredentialRecord
+    from spoiless.chatgpt import accounts
+    from spoiless.chatgpt.credentials import CredentialRecord
 
     manager, sessions = setup
     identity = VerifiedIdentity("expected", None)
@@ -319,7 +320,7 @@ def test_mismatched_stored_identity_never_opens_browser(setup, monkeypatch):
 
 
 def test_corrupt_keyring_cannot_start_returning_signin(setup, monkeypatch):
-    from spoiless import chatgpt_accounts as accounts
+    from spoiless.chatgpt import accounts
 
     manager, sessions = setup
     account_id = accounts.remember_verified(

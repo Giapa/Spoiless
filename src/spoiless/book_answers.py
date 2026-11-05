@@ -3,7 +3,7 @@
 import json
 from dataclasses import asdict
 
-from spoiless.chatgpt_inference import generate_response
+from spoiless.chatgpt.inference import generate_response
 from spoiless.citations import ValidatedAnswer, validate_answer
 from spoiless.library import connect, eligible_text
 from spoiless.retrieval import ProgressChanged, _check_snapshot, keyword_search

@@ -1,8 +1,8 @@
 """Discover the models available to a saved ChatGPT account."""
 
-from spoiless.chatgpt_auth import RESOURCE
-from spoiless.chatgpt_exchange import ExchangeError, _client, _json_request
-from spoiless.chatgpt_session import get_valid_access_token
+from spoiless.chatgpt.auth import RESOURCE
+from spoiless.chatgpt.exchange import ExchangeError, _client, _json_request
+from spoiless.chatgpt.session import get_valid_access_token
 
 
 class ModelCatalogError(Exception):

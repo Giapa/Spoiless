@@ -19,34 +19,34 @@ try:
 except ImportError:  # The rest of the app can still run on unverified platforms.
     fcntl = None
 
-from spoiless.chatgpt_accounts import (
+from spoiless.chatgpt.accounts import (
     AccountError,
     active_account,
     clear_active_account,
     get_account,
     select_saved_account,
 )
-from spoiless.chatgpt_auth import (
+from spoiless.chatgpt.auth import (
     ISSUER,
     RESOURCE,
     VerifiedIdentity,
     has_plan_permission,
 )
-from spoiless.chatgpt_credentials import (
+from spoiless.chatgpt.credentials import (
     CredentialStoreError,
     check_credential_store,
     delete_credentials,
     load_credentials,
     save_credentials,
 )
-from spoiless.chatgpt_exchange import (
+from spoiless.chatgpt.exchange import (
     TOKEN_URL,
     ExchangeError,
     RefreshTokenInvalid,
     _client,
     _json_request,
 )
-from spoiless.chatgpt_listener import LocalSignIn, Status
+from spoiless.chatgpt.listener import LocalSignIn, Status
 from spoiless.library import database_path
 
 

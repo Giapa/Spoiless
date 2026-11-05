@@ -7,7 +7,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from spoiless.chatgpt_auth import (
+from spoiless.chatgpt.auth import (
     ATTEMPT_SECONDS,
     AUTHORIZE_URL,
     DYNAMIC_CLIENT,

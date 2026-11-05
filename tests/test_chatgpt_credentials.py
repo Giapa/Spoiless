@@ -3,8 +3,8 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from spoiless import chatgpt_credentials as credentials
-from spoiless.chatgpt_auth import VerifiedIdentity
+from spoiless.chatgpt import credentials
+from spoiless.chatgpt.auth import VerifiedIdentity
 
 
 class MemoryKeyring:

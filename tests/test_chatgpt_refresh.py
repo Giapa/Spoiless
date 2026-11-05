@@ -2,10 +2,11 @@ import time
 
 import pytest
 
-from spoiless import chatgpt_accounts, chatgpt_credentials
-from spoiless.chatgpt_auth import VerifiedIdentity
-from spoiless.chatgpt_credentials import CredentialRecord
-from spoiless.chatgpt_session import get_valid_access_token
+from spoiless.chatgpt import accounts as chatgpt_accounts
+from spoiless.chatgpt import credentials as chatgpt_credentials
+from spoiless.chatgpt.auth import VerifiedIdentity
+from spoiless.chatgpt.credentials import CredentialRecord
+from spoiless.chatgpt.session import get_valid_access_token
 
 
 class MemoryKeyring:
@@ -101,7 +102,7 @@ def test_terminal_refresh_error_requires_sign_in_and_clears_unusable_tokens(
 ):
     import httpx
 
-    from spoiless.chatgpt_accounts import AccountError
+    from spoiless.chatgpt.accounts import AccountError
 
     original = chatgpt_credentials.load_credentials("oaiapp_reader")
     chatgpt_credentials.save_credentials(
@@ -127,7 +128,7 @@ def test_terminal_refresh_error_requires_sign_in_and_clears_unusable_tokens(
 def test_temporary_failure_preserves_credentials(saved_account, monkeypatch):
     import httpx
 
-    from spoiless.chatgpt_exchange import ExchangeError
+    from spoiless.chatgpt.exchange import ExchangeError
 
     original = chatgpt_credentials.load_credentials("oaiapp_reader")
     expired = original.model_copy(update={"expires_at": float(time.time() - 10)})
@@ -198,7 +199,7 @@ def test_malformed_provider_error_does_not_leak_or_erase_credentials(
 ):
     import httpx
 
-    from spoiless.chatgpt_exchange import ExchangeError
+    from spoiless.chatgpt.exchange import ExchangeError
 
     original = chatgpt_credentials.load_credentials("oaiapp_reader")
     expired = original.model_copy(update={"expires_at": float(time.time() - 10)})
@@ -229,7 +230,7 @@ def test_refresh_saves_rotated_token_even_if_plan_permission_was_removed(
 ):
     import httpx
 
-    from spoiless.chatgpt_accounts import AccountError
+    from spoiless.chatgpt.accounts import AccountError
 
     original = chatgpt_credentials.load_credentials("oaiapp_reader")
     chatgpt_credentials.save_credentials(
@@ -269,7 +270,7 @@ def test_overlapping_refresh_cannot_reuse_rotating_token(saved_account, monkeypa
 
     import httpx
 
-    from spoiless.chatgpt_session import SignInBusy
+    from spoiless.chatgpt.session import SignInBusy
 
     original = chatgpt_credentials.load_credentials("oaiapp_reader")
     chatgpt_credentials.save_credentials(

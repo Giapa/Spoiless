@@ -3,10 +3,11 @@ import time
 import httpx
 import pytest
 
-from spoiless import chatgpt_accounts, chatgpt_credentials
-from spoiless.chatgpt_auth import VerifiedIdentity
-from spoiless.chatgpt_credentials import CredentialRecord
-from spoiless.chatgpt_models import list_available_models
+from spoiless.chatgpt import accounts as chatgpt_accounts
+from spoiless.chatgpt import credentials as chatgpt_credentials
+from spoiless.chatgpt.auth import VerifiedIdentity
+from spoiless.chatgpt.credentials import CredentialRecord
+from spoiless.chatgpt.models import list_available_models
 
 
 class MemoryKeyring:
@@ -84,7 +85,7 @@ def test_model_list_uses_account_token_and_preserves_display_order(
 
 
 def test_identity_only_account_cannot_request_plan_model_catalog(tmp_path, monkeypatch):
-    from spoiless.chatgpt_accounts import AccountError
+    from spoiless.chatgpt.accounts import AccountError
 
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     backend = MemoryKeyring()
@@ -115,7 +116,7 @@ def test_identity_only_account_cannot_request_plan_model_catalog(tmp_path, monke
 def test_malformed_model_catalog_fails_without_exposing_provider_data(
     saved_account, monkeypatch
 ):
-    from spoiless.chatgpt_models import ModelCatalogError
+    from spoiless.chatgpt.models import ModelCatalogError
 
     real_client = httpx.Client
     monkeypatch.setattr(
@@ -222,7 +223,7 @@ def test_expired_token_is_refreshed_before_catalog_request(saved_account, monkey
 def test_provider_failure_does_not_expose_or_delete_credentials(
     saved_account, monkeypatch
 ):
-    from spoiless.chatgpt_models import ModelCatalogError
+    from spoiless.chatgpt.models import ModelCatalogError
 
     real_client = httpx.Client
     monkeypatch.setattr(

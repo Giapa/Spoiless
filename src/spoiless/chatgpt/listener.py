@@ -12,13 +12,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Literal
 from urllib.parse import parse_qs, urlsplit
 
-from spoiless.chatgpt_auth import (
+from spoiless.chatgpt.auth import (
     ATTEMPT_SECONDS,
     AuthorizationAttempt,
     AuthorizationDenied,
     host_id,
 )
-from spoiless.chatgpt_exchange import ConnectedAccount, exchange_and_store
+from spoiless.chatgpt.exchange import ConnectedAccount, exchange_and_store
 
 Status = Literal[
     "pending", "processing", "connected", "denied", "failed", "expired", "cancelled"

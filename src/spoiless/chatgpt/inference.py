@@ -5,10 +5,10 @@ from collections.abc import Callable
 import httpx
 from openai import APIError, OpenAI
 
-from spoiless.chatgpt_auth import RESOURCE
-from spoiless.chatgpt_exchange import _client
-from spoiless.chatgpt_models import list_available_models
-from spoiless.chatgpt_session import get_valid_access_token
+from spoiless.chatgpt.auth import RESOURCE
+from spoiless.chatgpt.exchange import _client
+from spoiless.chatgpt.models import list_available_models
+from spoiless.chatgpt.session import get_valid_access_token
 
 
 class InferenceError(Exception):
