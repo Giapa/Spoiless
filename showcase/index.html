@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Spoiless is a local reading companion that answers questions using chapters you have completed.">
+  <title>Spoiless — a reading companion</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="showcase.js" defer></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="#top">Spoiless<span aria-hidden="true">.</span></a>
+    <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">The app</a><a href="#limits">Limitations</a></nav>
+    <a class="header-link" href="https://github.com/Giapa/Spoiless">View the project ↗</a>
+  </header>
+  <main id="top">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="hero-name">Spoiless</p>
+        <h1 id="hero-title">Your reading companion.</h1>
+        <p>A local-first EPUB app for questions about the chapters you have finished, while the rest stays unread.</p>
+        <a class="button" href="https://github.com/Giapa/Spoiless#readme">See how to run it <span aria-hidden="true">↗</span></a>
+        <p class="hero-note">In development · Screens show sample data</p>
+      </div>
+      <div class="hero-art"><img src="assets/library.png" alt="Spoiless library showing a sample book and its reading-progress controls"></div>
+    </section>
+    <section id="how" class="how wrap" aria-labelledby="how-title">
+      <div><h2 id="how-title">Your place matters.</h2><p>Spoiless uses your saved reading progress to decide which parts of a book can be searched. The chapter you are reading is treated as unread.</p></div>
+      <div class="boundary" aria-label="Reading progress example">
+        <h3>Try a reading boundary</h3>
+        <label for="chapter">I am reading <strong id="chapter-label">Chapter 2</strong><!-- taste-skill-ignore: chapter numbers describe reading progress --></label>
+        <input id="chapter" type="range" min="2" max="4" value="2" aria-valuetext="Chapter 2">
+        <div class="chapter-row" aria-hidden="true"><span>Chapter 2</span><!-- taste-skill-ignore: chapter numbers describe reading progress --><span>Chapter 3</span><span>Finished</span></div>
+        <p id="boundary-result" aria-live="polite">Chapter 1 is available for questions. Chapter 2 and later stay unread.</p>
+        <noscript><p>For example, selecting Chapter 2 makes Chapter 1 available for questions.</p></noscript>
+      </div>
+    </section>
+    <section id="features" class="features" aria-labelledby="features-title">
+      <div class="wrap"><h2 id="features-title">Read, then ask.</h2>
+        <article class="feature"><div><h3>Bring your book.</h3><p>Import an EPUB and review its suggested chapter boundaries. Nothing becomes a confirmed chapter until you save it.</p></div><img src="assets/chapters.png" alt="Chapter review in Spoiless with a sample book" loading="lazy"></article>
+        <article class="feature reverse"><div><h3>Find your way back.</h3><p>Search completed chapters by words, or use local semantic search after setting up its model. Your book stays on your computer for search.</p></div><img src="assets/search.png" alt="The search form for completed chapters" loading="lazy"></article>
+        <article class="feature"><div><h3>Ask with context.</h3><p>Ask a question or request a recap. Answers include quotes matched against the supplied text, and the app withholds citations it cannot verify.</p></div><img src="assets/question.png" alt="A sample question and cited answer in Spoiless" loading="lazy"></article>
+      </div>
+    </section>
+    <section id="limits" class="limits wrap"><div><h2>Honest limits.</h2><p>Spoiler protection reduces risk; it cannot guarantee that an AI answer is correct or spoiler-free. A model can still invent details or draw on outside knowledge.</p></div><div><h3>What leaves your computer?</h3><p>When you ask for an AI answer, your question, relevant completed passages, and recent conversation may be sent to OpenAI. Books, progress and history are stored locally.</p><p>Sign-in and sign-out have been manually tried. Real-account model access and AI inference are not yet verified.</p></div></section>
+    <section class="closing wrap"><h2>Pick up where you left off.</h2><p>Explore the code, setup instructions, and the work still ahead.</p><a class="button" href="https://github.com/Giapa/Spoiless#readme">Explore the project <span aria-hidden="true">↗</span></a></section>
+  </main>
+  <footer class="wrap"><p>Spoiless</p><a href="https://github.com/Giapa/Spoiless">GitHub ↗</a></footer>
+</body>
+</html>

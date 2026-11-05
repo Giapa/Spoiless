@@ -40,6 +40,10 @@ Open the local URL shown by Vite. Run `npm run build` to check types and create 
 
 The frontend follows Feature-Sliced Design. `src/App.vue` provides the app shell; `src/pages/library` groups the library page's `ui`, `model`, and `api` code. Import the needed file directly; slices may only depend on lower layers. Add layers and slices when the application needs them.
 
+## Public showcase
+
+The static showcase is separate from the local app. Preview it with `python3 -m http.server 8001 --directory showcase`, then open `http://localhost:8001`. The root `netlify.toml` publishes the `showcase` directory when the project is connected to Netlify; the showcase does not host the local backend.
+
 ## Reading progress
 
 After confirming a book's chapters, choose your current chapter and save it in the library. The current chapter is treated as unread; select **Finished book** to include all chapters. Changing chapter boundaries clears the saved progress, so choose it again. Chapter review can show unread text when you explicitly open the manual review.
