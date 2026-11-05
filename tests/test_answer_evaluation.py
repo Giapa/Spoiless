@@ -217,3 +217,106 @@ def test_known_evidence_is_retrieved_and_cited(evaluation, monkeypatch, number, 
             "quote": evidence,
         }
     ]
+
+
+@pytest.mark.parametrize("current", [2, 4, 7])
+@pytest.mark.parametrize("chapter", range(1, 7))
+@pytest.mark.parametrize("mode", ["chapter", "through"])
+def test_recap_scope_boundaries_and_citations(
+    evaluation, monkeypatch, current, chapter, mode
+):
+    book = evaluation
+    library.set_progress(book, current)
+    requests = []
+    model_inputs = []
+    evidence = QUESTIONS[chapter - 1][1]
+
+    def fake_openai(request):
+        requests.append(request)
+        if (
+            request.method == "GET"
+            and str(request.url) == "https://api.openai.com/v1/models"
+        ):
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        assert (
+            request.method == "POST"
+            and str(request.url) == "https://api.openai.com/v1/responses"
+        )
+        prompt = json.loads(request.content)["input"][0]["content"]
+        payload = json.loads(prompt.split("\n", 1)[1])
+        model_inputs.append(payload)
+        if len(model_inputs) == 1:
+            index = next(
+                (i for i, text in enumerate(payload["passages"]) if evidence in text),
+                None,
+            )
+            result = {
+                "answer": "A supported source quote.",
+                "citations": [{"passage": index, "quote": evidence}],
+            }
+        else:
+            result = {
+                "answer": "UNSUPPORTED_SECRET",
+                "citations": [{"passage": 0, "quote": "FORGED_QUOTE"}],
+            }
+        delta = json.dumps(
+            {"type": "response.output_text.delta", "delta": json.dumps(result)}
+        )
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport,
+        "handle_request",
+        lambda self, request: fake_openai(request),
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    action = {"chapter": chapter, "mode": mode, "model": "model", "confirm": True}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(f"/api/books/{book}/recap", json=action, headers=headers)
+        if chapter < current:
+            forged = client.post(
+                f"/api/books/{book}/recap", json=action, headers=headers
+            )
+
+    if chapter >= current:
+        assert response.status_code == 422
+        assert requests == []
+        return
+
+    if mode == "chapter":
+        expected = [CHAPTERS[chapter - 1] + ("\n" if chapter == 1 else "")]
+    elif chapter == 1:
+        expected = [CHAPTERS[0] + "\n"]
+    else:
+        expected = [CHAPTERS[0] + "\n" + CHAPTERS[1], *CHAPTERS[2:chapter]]
+    assert len(model_inputs) == 2
+    assert all(payload["passages"] == expected for payload in model_inputs)
+    section = 0 if chapter <= 2 else chapter - 2
+    source = CHAPTERS[0] + "\n" + CHAPTERS[1] if chapter <= 2 else CHAPTERS[chapter - 1]
+    assert response.status_code == 200
+    assert response.json()["citations"] == [
+        {
+            "section_position": section,
+            "character_offset": source.index(evidence),
+            "quote": evidence,
+        }
+    ]
+    assert forged.status_code == 502
+    assert "UNSUPPORTED_SECRET" not in forged.text

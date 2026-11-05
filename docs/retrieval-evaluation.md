@@ -35,3 +35,11 @@ The evaluation imports the same synthetic EPUB into a temporary library and make
 A further **six cases** use the finished book and simulated responses that cite each question's known source phrase. They check that the local API returns the expected quote and its original section and character offset. On 2026-11-05, all **38 cases passed**, with no forbidden passages or fabricated responses observed in these cases.
 
 The model responses are scripted, and the six positive responses are given the expected source phrase. These checks do not measure whether a real model finds the right answer, supports every claim, or avoids generating spoilers. The sample is tiny and authored alongside the questions; the results are regression evidence, not a representative benchmark. The tests send no book text to OpenAI and use isolated temporary storage.
+
+## Offline recap safety evaluation
+
+The same local API evaluation also checks **36 recap scenarios**: six chapter selections, three reading-progress settings, and both single-chapter and cumulative scopes. The authored sample includes two chapters in one EPUB section, so the checks exercise an internal chapter boundary as well as section boundaries.
+
+For the **20 completed-chapter scenarios**, the test compares the entire text sent to the simulated model with independently authored expected text for the chosen scope, verifies a known source quote and its original offset, and repeats the request with a fabricated citation that must be rejected. For the **16 unread-chapter scenarios**, it expects a client error and no model request. On 2026-11-05, all 36 scenarios passed.
+
+These short synthetic chapters do not evaluate multi-stage long recaps. The responses are scripted, so these results do not measure recap completeness, factual support, or a real model's spoiler behavior. Existing long-recap failure and boundary tests run as part of the backend test suite; live-model evaluation remains outstanding.
