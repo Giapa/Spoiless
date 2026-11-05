@@ -1,5 +1,6 @@
 """Local API entry point."""
 
+from collections.abc import Callable
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -10,6 +11,7 @@ from spoiless import library
 from spoiless.chatgpt_accounts import AccountError, list_accounts
 from spoiless.chatgpt_credentials import CredentialStoreError
 from spoiless.chatgpt_session import SignInBusy, SignInManager, SignInStartError
+from spoiless.citations import ValidatedAnswer
 from spoiless.epub import MAX_ARCHIVE_BYTES, InvalidEpub, read_epub
 
 app = FastAPI(title="Spoiless")
@@ -461,11 +463,12 @@ def conversation(
     ]
 
 
-@app.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
-def answer_book(
-    book_id: str, request: Request, response: Response, action: AnswerRequest
+def _run_book_generation(
+    request: Request,
+    response: Response,
+    confirm: bool,
+    generate: Callable[[str], ValidatedAnswer],
 ) -> AnswerResponse:
-    from spoiless.book_answers import answer_book_question
     from spoiless.chatgpt_accounts import active_account
     from spoiless.chatgpt_exchange import ExchangeError
     from spoiless.chatgpt_inference import InferenceError
@@ -474,15 +477,13 @@ def answer_book(
     from spoiless.retrieval import ProgressChanged
 
     _local_request(request, mutation=True)
-    if not action.confirm:
+    if not confirm:
         raise HTTPException(422, "Confirmation is required.")
     account = active_account()
     if account is None:
         raise HTTPException(409, "Connect a ChatGPT account first.")
     try:
-        result = answer_book_question(
-            book_id, account.id, action.model, action.question
-        )
+        result = generate(account.id)
     except library.BookNotFound:
         raise HTTPException(404, "Book not found.") from None
     except ValueError as exc:
@@ -533,6 +534,43 @@ def answer_book(
     return AnswerResponse(
         answer=result.answer,
         citations=[AnswerCitation(**vars(item)) for item in result.citations],
+    )
+
+
+class RecapRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    chapter: int = Field(ge=1, strict=True)
+    model: str = Field(min_length=1, max_length=256, strict=True)
+    confirm: bool = Field(strict=True)
+
+
+@app.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
+def answer_book(
+    book_id: str, request: Request, response: Response, action: AnswerRequest
+) -> AnswerResponse:
+    from spoiless.book_answers import answer_book_question
+
+    return _run_book_generation(
+        request,
+        response,
+        action.confirm,
+        lambda account: answer_book_question(
+            book_id, account, action.model, action.question
+        ),
+    )
+
+
+@app.post("/api/books/{book_id}/recap", response_model=AnswerResponse)
+def recap_book(
+    book_id: str, request: Request, response: Response, action: RecapRequest
+) -> AnswerResponse:
+    from spoiless.recaps import recap_chapter
+
+    return _run_book_generation(
+        request,
+        response,
+        action.confirm,
+        lambda account: recap_chapter(book_id, account, action.model, action.chapter),
     )
 
 

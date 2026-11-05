@@ -122,6 +122,332 @@ def test_answer_api_returns_verified_text_without_unread_material(
     assert "UNREAD_SECRET" not in requests[-1].content.decode()
 
 
+def test_completed_chapter_recap_returns_citations_without_unread_text(
+    reading_setup, monkeypatch
+):
+    book, _ = reading_setup
+    prompts = []
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        prompts.append(json.loads(request.content)["input"][0]["content"])
+        answer = json.dumps(
+            {
+                "answer": "Mira found the key.",
+                "citations": [{"passage": 0, "quote": "found the key"}],
+            }
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 1, "model": "model", "confirm": True},
+            headers=headers,
+        )
+        history = client.get(f"/api/books/{book}/conversation")
+    assert response.status_code == 200
+    assert response.json() == {
+        "answer": "Mira found the key.",
+        "citations": [
+            {"section_position": 0, "character_offset": 5, "quote": "found the key"}
+        ],
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert history.json() == []
+    assert "UNREAD_SECRET" not in prompts[0]
+
+
+def test_recap_refuses_unread_chapter_without_contacting_openai(
+    reading_setup, monkeypatch
+):
+    book, _ = reading_setup
+    requests = []
+    monkeypatch.setattr(
+        httpx.HTTPTransport,
+        "handle_request",
+        lambda self, request: requests.append(request),
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        for chapter in (2, 3, 0, True):
+            response = client.post(
+                f"/api/books/{book}/recap",
+                json={"chapter": chapter, "model": "model", "confirm": True},
+                headers=headers,
+            )
+            assert response.status_code == 422
+        assert (
+            client.post(
+                f"/api/books/{book}/recap",
+                json={"chapter": 1, "model": "model", "confirm": False},
+                headers=headers,
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/api/books/{book}/recap",
+                json={"chapter": 1, "model": "model", "confirm": True},
+            ).status_code
+            == 403
+        )
+    assert requests == []
+
+
+def test_recap_refuses_oversized_chapter_without_contacting_openai(
+    reading_setup, monkeypatch
+):
+    chapter = "a" * 24001
+    book = library.add_book(Book("Long", (Section(chapter + "unread"),)))
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, len(chapter)),
+        ],
+    )
+    library.set_progress(book, 2)
+    requests = []
+    monkeypatch.setattr(
+        httpx.HTTPTransport,
+        "handle_request",
+        lambda self, request: requests.append(request),
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 1, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == 422
+    assert "too long" in response.json()["detail"]
+    assert requests == []
+
+
+def test_recap_uses_only_selected_chapter_and_preserves_unicode_offsets(
+    reading_setup, monkeypatch
+):
+    prefix = "FRONT 🐈 FIRST_CHAPTER "
+    selected = "Mira found the key. "
+    book = library.add_book(
+        Book("Other", (Section(prefix + selected + "LATER_SECRET"),))
+    )
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("front_matter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, len("FRONT 🐈 ")),
+            library.ReadingUnitStart("chapter", 0, len(prefix)),
+            library.ReadingUnitStart("chapter", 0, len(prefix + selected)),
+        ],
+    )
+    library.set_progress(book, 3)
+    prompts = []
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        prompts.append(json.loads(request.content)["input"][0]["content"])
+        answer = json.dumps(
+            {
+                "answer": "Mira found the key.",
+                "citations": [{"passage": 0, "quote": "found the key"}],
+            }
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 2, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == 200
+    assert response.json()["citations"] == [
+        {
+            "section_position": 0,
+            "character_offset": len(prefix) + 5,
+            "quote": "found the key",
+        }
+    ]
+    for secret in ("FRONT", "FIRST_CHAPTER", "LATER_SECRET"):
+        assert secret not in prompts[0]
+
+
+@pytest.mark.parametrize("failure", ["before", "during", "citation"])
+def test_recap_withholds_unsafe_or_stale_results(reading_setup, monkeypatch, failure):
+    book, _ = reading_setup
+    posts = []
+
+    def handle(request):
+        if request.method == "GET":
+            if failure == "before":
+                library.set_progress(book, 3)
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        posts.append(request)
+        if failure == "during":
+            library.set_progress(book, 3)
+        quote = "UNREAD_SECRET" if failure == "citation" else "found the key"
+        answer = json.dumps(
+            {"answer": "UNREAD_SECRET", "citations": [{"passage": 0, "quote": quote}]}
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 1, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == (502 if failure == "citation" else 409)
+    assert "UNREAD_SECRET" not in response.text
+    if failure == "before":
+        assert posts == []
+
+
+def test_recap_spans_sections_but_stops_at_next_chapter(reading_setup, monkeypatch):
+    book = library.add_book(
+        Book(
+            "Sections",
+            (
+                Section("first MIDDLE_START"),
+                Section("Mira found the key."),
+                Section("MIDDLE_END LATER_SECRET"),
+            ),
+        )
+    )
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 0, 6),
+            library.ReadingUnitStart("chapter", 2, 11),
+        ],
+    )
+    library.set_progress(book, 3)
+    prompts = []
+
+    def handle(request):
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"slug": "model", "display_name": "Model", "visibility": "list"}
+                    ]
+                },
+            )
+        prompts.append(json.loads(request.content)["input"][0]["content"])
+        answer = json.dumps(
+            {
+                "answer": "Mira found the key.",
+                "citations": [{"passage": 1, "quote": "found the key"}],
+            }
+        )
+        delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            text=(
+                f"data: {delta}\n\n"
+                'data: {"type":"response.completed",'
+                '"response":{"status":"completed"}}\n\n'
+            ),
+        )
+
+    monkeypatch.setattr(
+        httpx.HTTPTransport, "handle_request", lambda self, request: handle(request)
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            f"/api/books/{book}/recap",
+            json={"chapter": 2, "model": "model", "confirm": True},
+            headers=headers,
+        )
+    assert response.status_code == 200
+    assert response.json()["citations"] == [
+        {"section_position": 1, "character_offset": 5, "quote": "found the key"}
+    ]
+    assert "MIDDLE_START" in prompts[0] and "MIDDLE_END" in prompts[0]
+    assert "LATER_SECRET" not in prompts[0] and "first" not in prompts[0]
+
+
 def test_follow_up_sends_current_conversation_as_context(reading_setup, monkeypatch):
     book, _ = reading_setup
     prompts = []
