@@ -281,6 +281,13 @@ def _chapters(sections, navigation, headings):
         for entry in navigation
     ):
         return ()
+    # ponytail: a later spine file may start an unmarked chapter; reject it even
+    # when it is only a continuation, until reliable boundaries are available.
+    if starts and any(
+        (section, 0) not in starts
+        for section in range(min(starts)[0] + 1, len(sections))
+    ):
+        return ()
     numbers = []
     for point in sorted(starts):
         labels = [heading_text.get(point, "")]

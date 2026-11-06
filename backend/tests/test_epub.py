@@ -253,3 +253,35 @@ def test_detected_chapter_heading_is_available_as_title_without_navigation():
         NavigationEntry("Chapter 1", 1, 0),
         NavigationEntry("Chapter 2", 1, book.sections[1].text.index("Chapter 2")),
     )
+
+
+def test_unexplained_spine_section_cannot_be_absorbed_into_a_chapter():
+    package = """<package><manifest>
+      <item id="front" href="front.xhtml" media-type="application/xhtml+xml"/>
+      <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+      <item id="middle" href="middle.xhtml" media-type="application/xhtml+xml"/>
+      <item id="two" href="two.xhtml" media-type="application/xhtml+xml"/>
+      </manifest><spine><itemref idref="front"/><itemref idref="one"/>
+      <itemref idref="middle"/><itemref idref="two"/></spine></package>"""
+    files = {
+        "book/content.opf": package,
+        "book/front.xhtml": "<h1>Preface</h1><p>Introduction</p>",
+        "book/one.xhtml": "<h1>Chapter 1</h1><p>Read</p>",
+        "book/two.xhtml": "<h1>Chapter 2</h1><p>Later</p>",
+    }
+    # An unmarked chapter and a continuation are indistinguishable here.
+    for middle in ("<p>Unread chapter</p>", "<p>Chapter 1 continued</p>"):
+        book = read_epub(epub(extra={**files, "book/middle.xhtml": middle}))
+        assert book.chapters == ()
+
+    # Front matter and chapters in separate files remain supported.
+    book = read_epub(
+        epub(
+            extra={
+                **files,
+                "book/middle.xhtml": "<h1>Chapter 2</h1><p>Read</p>",
+                "book/two.xhtml": "<h1>Chapter 3</h1><p>Later</p>",
+            }
+        )
+    )
+    assert book.chapters == ((1, 0), (2, 0), (3, 0))
