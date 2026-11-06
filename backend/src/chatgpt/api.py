@@ -178,10 +178,8 @@ def chatgpt_models(
             ) from None
         except SignInBusy:
             raise HTTPException(409, "ChatGPT account is busy. Please retry.") from None
-        except ModelCatalogError:
-            raise HTTPException(
-                503, "Could not load ChatGPT models. Please retry."
-            ) from None
+        except ModelCatalogError as exc:
+            raise HTTPException(503, str(exc)) from None
         except AccountError:
             raise HTTPException(409, "This account needs to sign in again.") from None
         except (CredentialStoreError, SignInStartError):

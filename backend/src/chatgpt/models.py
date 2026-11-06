@@ -37,5 +37,18 @@ def list_available_models(account_id: str) -> list[dict[str, str]]:
                 raise ValueError
             visible.append({"slug": slug, "display_name": name})
         return visible
-    except (ExchangeError, KeyError, ValueError, TypeError):
+    except ExchangeError as exc:
+        messages = {
+            401: "ChatGPT did not accept this connection. "
+            "Check the selected account and sign in again if needed.",
+            403: "ChatGPT denied access to models for this account. "
+            "Check account eligibility and permissions.",
+            429: "ChatGPT is rate limiting model requests. Please retry later.",
+        }
+        raise ModelCatalogError(
+            messages.get(
+                exc.status_code, "Could not load ChatGPT models. Please retry."
+            )
+        ) from None
+    except (KeyError, ValueError, TypeError):
         raise ModelCatalogError("Could not load the ChatGPT model catalog.") from None

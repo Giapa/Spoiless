@@ -57,21 +57,32 @@ async function loadModels() {
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
       body: JSON.stringify({ confirm: true }),
     });
-    if (!response.ok) throw new Error();
+    if (!response.ok) {
+      const detail = z
+        .object({ detail: z.string() })
+        .safeParse(await response.json().catch(() => null));
+      throw new Error(
+        detail.success ? detail.data.detail : "Could not load ChatGPT models. Please retry.",
+      );
+    }
     const result = z
       .array(z.object({ slug: z.string(), display_name: z.string() }))
-      .parse(await response.json());
+      .safeParse(await response.json().catch(() => null));
+    if (!result.success) throw new Error("Could not load ChatGPT models. Please retry.");
     const active = await activeAccountId();
     if (generation === current) {
       if (active !== accountId) throw new Error("The active account changed. Please retry.");
       loadedAccountId = accountId;
-      models.value = result;
+      models.value = result.data;
       loaded.value = true;
     }
   } catch (err) {
     if (generation === current)
       error.value =
-        err instanceof Error && err.message
+        err instanceof Error &&
+        !(err instanceof TypeError) &&
+        !(err instanceof z.ZodError) &&
+        err.message
           ? err.message
           : "Could not load ChatGPT models. Check your connection and try again.";
   } finally {

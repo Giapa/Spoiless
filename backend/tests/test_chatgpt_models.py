@@ -246,3 +246,26 @@ def test_provider_failure_does_not_expose_or_delete_credentials(
         chatgpt_credentials.load_credentials("oaiapp_reader").access_token
         == "secret-access"
     )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(401, "connection"), (403, "eligibility"), (429, "rate limiting")],
+)
+def test_provider_errors_explain_recovery(saved_account, monkeypatch, status, expected):
+    from src.chatgpt.models import ModelCatalogError
+
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(status, text="secret-access")
+            ),
+            **kwargs,
+        ),
+    )
+    with pytest.raises(ModelCatalogError, match=expected) as error:
+        list_available_models(saved_account)
+    assert "secret-access" not in str(error.value)

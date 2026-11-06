@@ -39,6 +39,10 @@ MAX_RESPONSE_BYTES = 256 * 1024
 class ExchangeError(Exception):
     """The authorization exchange or trusted-key lookup failed."""
 
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class RefreshTokenInvalid(ExchangeError):
     """The provider confirmed that the renewable session cannot be used."""
@@ -100,6 +104,11 @@ def _json_request(
                 raise RefreshTokenInvalid("This account needs to sign in again.")
             raise ValueError("Refresh failed")
         return result
+    except httpx.HTTPStatusError as exc:
+        raise ExchangeError(
+            "Could not complete the OpenAI request.",
+            status_code=exc.response.status_code,
+        ) from None
     except (httpx.HTTPError, ValueError, UnicodeError):
         # Never surface server bodies, callback codes, or tokens in an error.
         raise ExchangeError("Could not complete the OpenAI sign-in request.") from None

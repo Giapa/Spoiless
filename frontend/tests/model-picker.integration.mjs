@@ -120,6 +120,20 @@ test("reader can retry after a model lookup failure", async () => {
   }
 });
 
+test("reader sees the account error and can retry model loading", async () => {
+  const { browser, page } = await openApp();
+  try {
+    await page.route("**/api/chatgpt/models", async (route) => {
+      await route.fulfill({ status: 409, json: { detail: "This account needs to sign in again." } });
+      await page.unroute("**/api/chatgpt/models");
+    });
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("alert").getByText("This account needs to sign in again.").waitFor();
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a2");
+  } finally { await browser.close(); }
+});
+
 test("signing out clears the previous account's model selection", async () => {
   const { browser, page } = await openApp();
   try {

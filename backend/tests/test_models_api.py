@@ -191,6 +191,30 @@ def test_temporary_model_provider_failure_returns_safe_error(
     assert "secret-token" not in response.text
 
 
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [(401, "connection"), (403, "eligibility"), (429, "rate limiting")],
+)
+def test_model_provider_errors_offer_safe_recovery(
+    reading_setup, monkeypatch, status, expected
+):
+    monkeypatch.setattr(
+        httpx.HTTPTransport,
+        "handle_request",
+        lambda self, request: httpx.Response(status, text="secret-token"),
+    )
+    headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
+    with TestClient(
+        app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 1234)
+    ) as client:
+        response = client.post(
+            "/api/chatgpt/models", json={"confirm": True}, headers=headers
+        )
+    assert response.status_code == 503
+    assert expected in response.json()["detail"]
+    assert "secret-token" not in response.text
+
+
 def test_missing_credentials_requires_signing_in_again(reading_setup):
     chatgpt_credentials.delete_credentials("oaiapp_reader")
     headers = {"Origin": "http://127.0.0.1:8000", "X-Spoiless-Action": "1"}
