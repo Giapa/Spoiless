@@ -141,11 +141,11 @@ def fake_openai(self, request):
     ):
         body = json.loads(request.content)
         prompt = body["input"][0]["content"]
-        if prompt.startswith("Determine whether the start of 'after'"):
+        if prompt.startswith("For each item, determine whether"):
             answer = json.dumps(
                 {"uncertain": True}
                 if body["model"] == "a2"
-                else {"boundary": True}
+                else {"boundaries": [True] * len(json.loads(prompt.rsplit("\n", 1)[1]))}
             )
             delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
             return httpx.Response(

@@ -30,14 +30,16 @@ def test_ai_starts_use_exact_unicode_offsets_and_protect_current_chapter(
 
     def classify(account, model, prompt):
         calls.append(prompt)
-        return '{"boundary":true}'
+        return json.dumps(
+            {"boundaries": [True] * len(json.loads(prompt.rsplit("\n", 1)[1]))}
+        )
 
     monkeypatch.setattr(chapter_analysis, "generate_response", classify)
     chapter_analysis.analyze_chapters(book_id, "account", "model")
     storage.set_progress(book_id, 2)
     eligible = storage.eligible_text(book_id)[0][1]
     assert "First chapter" in eligible and "Secret" not in eligible
-    assert len(calls) == 2
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize(
@@ -49,6 +51,9 @@ def test_ai_starts_use_exact_unicode_offsets_and_protect_current_chapter(
         '{"boundary":1}',
         '{"boundary":true,"extra":1}',
         '{"boundary":"true"}',
+        '{"boundaries":[true]}',
+        '{"boundaries":[true,1]}',
+        '{"boundaries":[true,true,true]}',
     ],
 )
 def test_invalid_suggestions_never_create_a_map(book_id, monkeypatch, response):
@@ -64,7 +69,9 @@ def test_concurrent_map_is_not_overwritten(book_id, monkeypatch):
     def generate(*args):
         storage.confirm_reading_units(book_id, existing)
         storage.set_progress(book_id, 1)
-        return '{"boundary":true}'
+        return json.dumps(
+            {"boundaries": [True] * len(json.loads(args[2].rsplit("\n", 1)[1]))}
+        )
 
     monkeypatch.setattr(chapter_analysis, "generate_response", generate)
     with pytest.raises(storage.ChapterMapChanged):
@@ -91,7 +98,7 @@ def test_large_book_uses_small_passages_only_for_ambiguous_boundaries(
 
     def classify(account, model, prompt):
         calls.append(prompt)
-        return '{"boundary":false}'
+        return '{"boundaries":[false]}'
 
     monkeypatch.setattr(chapter_analysis, "generate_response", classify)
     chapter_analysis.analyze_chapters(book_id, "account", "model")
@@ -111,7 +118,7 @@ def test_missing_numbered_chapter_fails_closed(tmp_path, monkeypatch):
         Book("Gap", (Section("Chapter 1\nRead\nChapter 3\nUnread"),))
     )
     monkeypatch.setattr(
-        chapter_analysis, "generate_response", lambda *args: '{"boundary":true}'
+        chapter_analysis, "generate_response", lambda *args: '{"boundaries":[true]}'
     )
     with pytest.raises(ValueError):
         chapter_analysis.analyze_chapters(book, "account", "model")
@@ -151,11 +158,39 @@ def test_chapter_reference_in_prose_is_checked_not_assumed(tmp_path, monkeypatch
         calls.append(prompt)
         payload = json.loads(prompt.rsplit("\n", 1)[1])
         return json.dumps(
-            {"boundary": payload["after"].startswith("Chapter 2\nUnread")}
+            {
+                "boundaries": [
+                    item["after"].startswith("Chapter 2\nUnread") for item in payload
+                ]
+            }
         )
 
     monkeypatch.setattr(chapter_analysis, "generate_response", classify)
     chapter_analysis.analyze_chapters(book, "account", "model")
-    assert len(calls) == 2
+    assert len(calls) == 1
     storage.set_progress(book, 2)
     assert "Unread" not in storage.eligible_text(book)[0][1]
+
+
+def test_more_than_200_ambiguous_passages_are_batched(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    book = storage.add_book(
+        Book(
+            "Many",
+            (
+                Section("Chapter 1\nRead"),
+                *(Section(f"Continuation {i}") for i in range(205)),
+            ),
+        )
+    )
+    sizes = []
+
+    def classify(account, model, prompt):
+        passages = json.loads(prompt.rsplit("\n", 1)[1])
+        sizes.append(len(passages))
+        return json.dumps({"boundaries": [False] * len(passages)})
+
+    monkeypatch.setattr(chapter_analysis, "generate_response", classify)
+    chapter_analysis.analyze_chapters(book, "account", "model")
+    assert sum(sizes) == 205 and max(sizes) <= 5
+    assert len(storage.get_reading_units(book)) == 1
