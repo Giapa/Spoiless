@@ -16,7 +16,6 @@ const schema = z.array(
     ),
   }),
 );
-const details = ref<HTMLDetailsElement | null>(null);
 const turns = ref<z.infer<typeof schema>>([]);
 const loading = ref(false);
 const error = ref("");
@@ -51,69 +50,59 @@ async function load() {
     }
   }
 }
-function toggle() {
-  if (details.value?.open) void load();
-  else clear();
-}
-function hide() {
-  clear();
-  if (details.value) details.value.open = false;
-}
 watch(
   () => props.version,
-  () => {
-    if (details.value?.open) void load();
-  },
+  () => void load(),
 );
-onMounted(() => window.addEventListener("blur", hide));
+onMounted(() => {
+  void load();
+  window.addEventListener("blur", clear);
+});
 onBeforeUnmount(() => {
-  window.removeEventListener("blur", hide);
+  window.removeEventListener("blur", clear);
   clear();
 });
 </script>
 
 <template>
-  <details ref="details" class="history" @toggle="toggle">
-    <summary>Conversation history</summary>
-    <section aria-label="Conversation history">
-      <p>
-        Questions and answers are stored on this device. Recent turns may be sent to OpenAI with new
-        questions. Moving backward starts a new conversation.
-      </p>
-      <p v-if="loading" role="status">Loading conversation…</p>
-      <p v-else-if="error" role="alert">
-        {{ error }} <button type="button" @click="load">Retry</button>
-      </p>
-      <p v-else-if="!turns.length">No questions in this conversation yet.</p>
-      <ol v-else class="turns">
-        <li v-for="(turn, index) in turns" :key="index">
-          <p class="question">{{ turn.question }}</p>
-          <p class="answer">{{ turn.answer }}</p>
-          <ul v-if="turn.citations.length" aria-label="Citations">
-            <li v-for="(citation, citationIndex) in turn.citations" :key="citationIndex">
-              <p>
-                Section {{ citation.section_position + 1 }} · character
-                {{ citation.character_offset + 1 }}
-              </p>
-              <blockquote>{{ citation.quote }}</blockquote>
-            </li>
-          </ul>
-        </li>
-      </ol>
-    </section>
-  </details>
+  <section class="history" aria-label="Conversation history">
+    <h3>Conversation</h3>
+    <p>
+      Questions and answers are stored on this device. Recent turns may be sent to OpenAI with new
+      questions. Moving backward starts a new conversation.
+    </p>
+    <p v-if="loading" role="status">Loading conversation…</p>
+    <p v-else-if="error" role="alert">
+      {{ error }} <button type="button" @click="load">Retry</button>
+    </p>
+    <p v-else-if="!turns.length">No questions in this conversation yet.</p>
+    <ol v-else class="turns">
+      <li v-for="(turn, index) in turns" :key="index">
+        <p class="question">{{ turn.question }}</p>
+        <p class="answer">{{ turn.answer }}</p>
+        <ul v-if="turn.citations.length" aria-label="Citations">
+          <li v-for="(citation, citationIndex) in turn.citations" :key="citationIndex">
+            <p>
+              Section {{ citation.section_position + 1 }} · character
+              {{ citation.character_offset + 1 }}
+            </p>
+            <blockquote>{{ citation.quote }}</blockquote>
+          </li>
+        </ul>
+      </li>
+    </ol>
+  </section>
 </template>
 
 <style scoped>
 .history {
   margin-top: 12px;
-  max-width: 620px;
+  max-width: 800px;
+  min-height: 100px;
 }
-summary {
-  cursor: pointer;
-  text-decoration: underline;
-  min-height: 44px;
-  padding: 10px 0;
+h3 {
+  font-size: 15px;
+  margin: 24px 0 10px;
 }
 p {
   font-size: 14px;
@@ -126,8 +115,8 @@ p {
   padding: 0;
 }
 .turns > li {
-  border-top: 1px solid #eee;
-  padding: 10px 0;
+  border-top: 1px solid #e3e7e1;
+  padding: 16px 0;
 }
 .question {
   font-weight: 600;

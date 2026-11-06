@@ -37,6 +37,7 @@ async function openApp() {
     try { await page.goto(`http://127.0.0.1:${port}`); break; }
     catch (error) { if (tries >= 50) throw error; await new Promise((r) => setTimeout(r, 100)); }
   }
+  await page.getByText("Account and model", { exact: true }).click();
   return { browser, page };
 }
 
@@ -89,6 +90,7 @@ test("reader sees an empty state when the account has no models", async () => {
     const third = accounts.find((account) => account.email === "c@example.test").id;
     assert.equal((await page.request.post(`${origin}/api/chatgpt/accounts/select`, { headers, data: { account_id: third, confirm: true } })).status(), 200);
     await page.reload();
+    await page.getByText("Account and model", { exact: true }).click();
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByText(/no models are available/i).waitFor();
     assert.equal(await page.getByRole("combobox", { name: "ChatGPT model" }).count(), 0);
@@ -110,6 +112,7 @@ test("reader can retry after a model lookup failure", async () => {
     const fourth = accounts.find((account) => account.email === "d@example.test").id;
     assert.equal((await page.request.post(`${origin}/api/chatgpt/accounts/select`, { headers, data: { account_id: fourth, confirm: true } })).status(), 200);
     await page.reload();
+    await page.getByText("Account and model", { exact: true }).click();
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByRole("alert").getByText(/could not load chatgpt models/i).waitFor();
     assert.equal((await page.locator("body").innerText()).includes("secret-provider-details"), false);

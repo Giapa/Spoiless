@@ -37,6 +37,7 @@ async function openApp() {
     try { await page.goto(`http://127.0.0.1:${port}`); break; }
     catch (error) { if (tries >= 50) throw error; await new Promise((r) => setTimeout(r, 100)); }
   }
+  await page.getByText("Account and model", { exact: true }).click();
   return { browser, page };
 }
 

@@ -2,15 +2,11 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { z } from "zod";
 
-const props = defineProps<{ bookId: string; model: string }>();
+const props = defineProps<{ bookId: string; model: string; disabled?: boolean }>();
 const emit = defineEmits<{ saved: [] }>();
 const question = ref("");
 const busy = ref(false);
 const error = ref("");
-const answer = ref<{
-  answer: string;
-  citations: { section_position: number; character_offset: number; quote: string }[];
-} | null>(null);
 const schema = z.object({
   answer: z.string(),
   citations: z.array(
@@ -28,9 +24,9 @@ function clear() {
   request = null;
   busy.value = false;
   error.value = "";
-  answer.value = null;
 }
 async function ask() {
+  if (props.disabled) return;
   clear();
   const controller = new AbortController();
   request = controller;
@@ -56,9 +52,9 @@ async function ask() {
         throw new Error(detail.data.detail);
       throw new Error("Could not answer the question. Please try again.");
     }
-    const result = schema.parse(await response.json());
+    schema.parse(await response.json());
     if (request === controller) {
-      answer.value = result;
+      question.value = "";
       emit("saved");
     }
   } catch (cause) {
@@ -81,16 +77,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <details class="question" @toggle="clear">
-    <summary>Ask about completed chapters</summary>
+  <section class="question" aria-label="Ask about completed chapters">
     <form @submit.prevent="ask">
+      <label :for="`question-${bookId}`">Your question</label>
+      <textarea
+        :id="`question-${bookId}`"
+        v-model="question"
+        maxlength="500"
+        :disabled="disabled"
+        required
+        @input="clear"
+      />
       <p>
-        Your question and relevant passages from completed chapters are sent to OpenAI. Recent
-        questions and answers may also be sent to OpenAI. AI answers may contain spoilers.
-      </p>
-      <p>
-        Questions and answers are saved on this device. The displayed answer clears when you leave
-        this window.
+        Your question, relevant completed passages and recent conversation may be sent to OpenAI.
+        Questions and answers are saved on this device. AI answers may contain spoilers.
       </p>
       <p v-if="model">
         Using ChatGPT plan ·
@@ -98,49 +98,25 @@ onBeforeUnmount(() => {
           >Manage usage</a
         >
       </p>
-      <label :for="`question-${bookId}`">Your question</label>
-      <textarea
-        :id="`question-${bookId}`"
-        v-model="question"
-        maxlength="500"
-        required
-        @input="clear"
-      />
-      <p v-if="!model">Choose a ChatGPT model below to ask a question.</p>
-      <button type="submit" :disabled="busy || !model || !question.trim()">
+      <p v-if="disabled">Save progress beyond the first chapter to start a conversation.</p>
+      <p v-if="!model">Choose a model in Account and model to ask a question.</p>
+      <button type="submit" :disabled="disabled || busy || !model || !question.trim()">
         {{ busy ? "Asking…" : "Ask" }}
       </button>
     </form>
     <p v-if="busy" role="status">Checking the completed chapters…</p>
     <p v-if="error" role="alert">{{ error }}</p>
-    <div v-if="answer" aria-label="Answer">
-      <p class="answer">{{ answer.answer }}</p>
-      <ol v-if="answer.citations.length" aria-label="Citations">
-        <li
-          v-for="citation in answer.citations"
-          :key="`${citation.section_position}-${citation.character_offset}`"
-        >
-          <p>
-            Section {{ citation.section_position + 1 }} · character
-            {{ citation.character_offset + 1 }}
-          </p>
-          <blockquote>{{ citation.quote }}</blockquote>
-        </li>
-      </ol>
-    </div>
-  </details>
+  </section>
 </template>
 
 <style scoped>
 .question {
-  margin-top: 12px;
-  max-width: 620px;
-}
-summary {
-  cursor: pointer;
-  text-decoration: underline;
-  min-height: 44px;
-  padding: 10px 0;
+  margin-top: 20px;
+  max-width: 800px;
+  padding: 18px;
+  border: 1px solid #ccd6cc;
+  border-radius: 16px;
+  background: white;
 }
 form {
   display: grid;
@@ -164,7 +140,10 @@ textarea {
   resize: vertical;
 }
 button {
-  justify-self: start;
+  justify-self: end;
+  color: white;
+  background: #315b45;
+  border-color: #315b45;
 }
 p {
   font-size: 14px;

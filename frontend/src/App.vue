@@ -3,11 +3,6 @@ import LibraryPage from "./pages/library/ui/LibraryPage.vue";
 </script>
 
 <template>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <span class="mark" aria-hidden="true">S</span><span>Spoiless</span>
-    </div>
-  </header>
   <LibraryPage />
 </template>
 
@@ -34,31 +29,5 @@ button:disabled {
 button:focus-visible {
   outline: 3px solid #1d5fbf;
   outline-offset: 3px;
-}
-.topbar {
-  background: #fff;
-  border-bottom: 1px solid #e6e6e6;
-}
-.topbar-inner {
-  max-width: 1064px;
-  margin: auto;
-  padding: 18px 24px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 650;
-}
-.mark {
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid #333;
-  width: 29px;
-  height: 29px;
-  font-family: Georgia, serif;
-}
-@media (max-width: 600px) {
-  .topbar-inner {
-    padding-inline: 16px;
-  }
 }
 </style>
