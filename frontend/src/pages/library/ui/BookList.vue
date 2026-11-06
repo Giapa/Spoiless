@@ -31,7 +31,11 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
           <h3>{{ book.title }}</h3>
           <p>
             {{ book.section_count }} {{ book.section_count === 1 ? "section" : "sections" }} ·
-            {{ book.chapters_confirmed ? "Chapters confirmed" : "Chapter review needed" }}
+            {{ book.chapters_confirmed ? "Chapters available" : "Chapters could not be detected" }}
+          </p>
+          <p v-if="!book.chapters_confirmed">
+            Books imported before this update need to be imported again. If detection still fails,
+            this book cannot be used for chapter-based search.
           </p>
           <ReadingProgress
             v-if="book.chapters_confirmed"
@@ -59,15 +63,6 @@ defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
           />
         </div>
         <div class="actions">
-          <button
-            class="review"
-            type="button"
-            :disabled="busy"
-            :aria-label="`Review chapters for ${book.title}`"
-            @click="$emit('review', book)"
-          >
-            Review chapters
-          </button>
           <button
             class="delete"
             type="button"
@@ -143,14 +138,6 @@ h2 {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-.review {
-  border: 0;
-  background: transparent;
-  text-decoration: underline;
-  min-height: 44px;
-  padding: 10px;
-  white-space: nowrap;
 }
 .book-list {
   padding: 0;

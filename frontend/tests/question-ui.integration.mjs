@@ -40,6 +40,38 @@ async function openApp() {
   return { browser, page };
 }
 
+test("available chapters can be selected without review", async () => {
+  const { browser, page } = await openApp();
+  try {
+    await page.getByText("Chapters available", { exact: false }).waitFor();
+    assert.equal(await page.getByRole("button", { name: /review chapters/i }).count(), 0);
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    await progress.selectOption({ label: "Chapter 1" });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+    assert.equal(await page.getByText("Ask about completed chapters").count(), 0);
+    await progress.selectOption({ label: "Chapter 2" });
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("Reading progress saved.").waitFor();
+  } finally { await browser.close(); }
+});
+
+test("unavailable chapter detection explains reimport without review", async () => {
+  const { browser, page } = await openApp();
+  try {
+    await page.route("**/api/books", async (route) => {
+      const response = await route.fetch();
+      const books = await response.json();
+      await route.fulfill({ response, json: books.map((book) => ({ ...book, chapters_confirmed: false })) });
+    });
+    await page.reload();
+    await page.getByText("Chapters could not be detected", { exact: false }).waitFor();
+    await page.getByText(/books imported before this update/i).waitFor();
+    assert.equal(await page.getByRole("button", { name: /review chapters/i }).count(), 0);
+    assert.equal(await page.getByRole("combobox", { name: "Current chapter" }).count(), 0);
+  } finally { await browser.close(); }
+});
+
 
 test("reader asks a question and sees a verified citation", async () => {
   const { browser, page } = await openApp();

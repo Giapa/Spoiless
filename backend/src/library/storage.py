@@ -35,7 +35,21 @@ def add_book(book: Book) -> str:
                 for index, entry in enumerate(book.navigation)
             ),
         )
+        if book.chapters:
+            _insert_detected_units(db, book_id, book.chapters)
     return book_id
+
+
+def _insert_detected_units(db, book_id, chapters):
+    starts = [("chapter", *point) for point in chapters]
+    if chapters[0] != (0, 0):
+        starts.insert(0, ("front_matter", 0, 0))
+    db.executemany(
+        "INSERT INTO reading_units "
+        "(book_id, position, kind, section_position, character_offset) "
+        "VALUES (?, ?, ?, ?, ?)",
+        ((book_id, index, *start) for index, start in enumerate(starts)),
+    )
 
 
 def list_books() -> list[tuple[str, str, int, bool]]:
@@ -203,9 +217,9 @@ def set_progress(book_id: str, current_chapter: int) -> ReadingProgress:
         progress = _progress(db, book_id)
         if (
             type(current_chapter) is not int
-            or not 2 <= current_chapter <= progress.chapter_count + 1
+            or not 1 <= current_chapter <= progress.chapter_count + 1
         ):
-            raise ValueError("Confirm chapters and choose a valid current chapter.")
+            raise ValueError("Choose a valid current chapter.")
         if (
             progress.current_chapter is not None
             and current_chapter < progress.current_chapter
@@ -235,9 +249,11 @@ def eligible_text(book_id: str) -> list[tuple[int, str]]:
         progress = _progress(db, book_id)
         if (
             progress.current_chapter is None
-            or not 2 <= progress.current_chapter <= progress.chapter_count + 1
+            or not 1 <= progress.current_chapter <= progress.chapter_count + 1
         ):
-            raise ValueError("Confirm chapters and select reading progress first.")
+            raise ValueError("Select reading progress first.")
+        if progress.current_chapter == 1:
+            return []
         boundary = db.execute(
             """SELECT section_position, character_offset FROM reading_units
                WHERE book_id = ? AND kind = 'chapter'

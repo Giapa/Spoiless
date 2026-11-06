@@ -31,7 +31,7 @@ async function load() {
     progress.value = updated;
     choice.value = progress.value.current_chapter?.toString() ?? "";
     emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
-    emit("availability", progress.value.current_chapter !== null);
+    emit("availability", (progress.value.current_chapter ?? 0) > 1);
   } catch {
     if (version !== loadVersion) return;
     emit("availability", false);
@@ -58,7 +58,7 @@ async function save() {
     progress.value = schema.parse(await response.json());
     notice.value = "Reading progress saved.";
     emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
-    emit("availability", progress.value.current_chapter !== null);
+    emit("availability", (progress.value.current_chapter ?? 0) > 1);
   } catch {
     error.value = "Could not save reading progress. Try again.";
   } finally {
@@ -67,7 +67,10 @@ async function save() {
 }
 function changeChoice() {
   notice.value = "";
-  emit("availability", Number(choice.value) === progress.value?.current_chapter);
+  emit(
+    "availability",
+    Number(choice.value) > 1 && Number(choice.value) === progress.value?.current_chapter,
+  );
 }
 function refresh() {
   if (!busy.value) void load();
@@ -95,12 +98,8 @@ onBeforeUnmount(() => {
           @change="changeChoice"
         >
           <option value="" disabled>Choose progress</option>
-          <option
-            v-for="chapter in Math.max(0, progress.chapter_count - 1)"
-            :key="chapter"
-            :value="String(chapter + 1)"
-          >
-            Chapter {{ chapter + 1 }}
+          <option v-for="chapter in progress.chapter_count" :key="chapter" :value="String(chapter)">
+            Chapter {{ chapter }}
           </option>
           <option :value="String(progress.chapter_count + 1)">Finished book</option>
         </select>
@@ -112,6 +111,10 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <p>The current chapter is treated as unread.</p>
+      <p>
+        Automatic detection can miss or misidentify chapter boundaries, which could expose unread
+        text. Check the source EPUB before relying on this selection.
+      </p>
       <p v-if="notice" role="status">{{ notice }}</p>
     </form>
   </div>

@@ -53,7 +53,7 @@ def connect():
             );
             CREATE TABLE IF NOT EXISTS reading_progress (
                 book_id TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
-                current_chapter INTEGER NOT NULL CHECK (current_chapter >= 2)
+                current_chapter INTEGER NOT NULL CHECK (current_chapter >= 1)
             );
             CREATE TABLE IF NOT EXISTS conversation_turns (
                 id INTEGER PRIMARY KEY,
@@ -88,6 +88,28 @@ def connect():
                 PRIMARY KEY (book_id, position)
             );
         """)
+        progress_schema = db.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'reading_progress'"
+        ).fetchone()[0]
+        if "current_chapter >= 2" in progress_schema:
+            db.execute("BEGIN IMMEDIATE")
+            progress_schema = db.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'reading_progress'"
+            ).fetchone()[0]
+            if "current_chapter >= 2" in progress_schema:
+                db.execute("""CREATE TABLE reading_progress_new (
+                    book_id TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+                    current_chapter INTEGER NOT NULL CHECK (current_chapter >= 1)
+                )""")
+                db.execute(
+                    "INSERT INTO reading_progress_new SELECT * FROM reading_progress"
+                )
+                db.execute("DROP TABLE reading_progress")
+                db.execute(
+                    "ALTER TABLE reading_progress_new RENAME TO reading_progress"
+                )
+            db.commit()
         yield db
     finally:
         db.close()

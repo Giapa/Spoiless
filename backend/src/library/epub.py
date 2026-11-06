@@ -1,5 +1,6 @@
 """Read EPUB content as unconfirmed, ordered spine sections."""
 
+import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from io import BytesIO
@@ -40,6 +41,7 @@ class Book:
     title: str
     sections: tuple[Section, ...]
     navigation: tuple[NavigationEntry, ...] = ()
+    chapters: tuple[tuple[int, int], ...] = ()
 
 
 class TextExtractor(HTMLParser):
@@ -49,12 +51,26 @@ class TextExtractor(HTMLParser):
         self.hidden_depth = 0
         self.raw_length = 0
         self.anchors: dict[str, int | None] = {}
+        self.headings: list[tuple[str, bool]] = []
 
     def append(self, text: str) -> None:
         self.parts.append(text)
         self.raw_length += len(text)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if not self.hidden_depth and tag.lower() in {
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+        }:
+            attributes = dict(attrs)
+            marker = f"\0heading{len(self.headings)}"
+            self.anchors[marker] = self.raw_length
+            semantic = "chapter" in (attributes.get("epub:type") or "").split()
+            self.headings.append((marker, semantic))
         if tag.lower() in {"script", "style", "head"}:
             self.hidden_depth += 1
         elif not self.hidden_depth and tag.lower() in {
@@ -167,6 +183,7 @@ def _navigation(
     source = nav_item if nav_item is not None else ncx_item
     if source is None or not source.get("href"):
         return ()
+
     try:
         nav_path = _resolve(package_path, source.attrib["href"])
         root = _xml(archive, nav_path)
@@ -219,6 +236,70 @@ def _navigation(
         return ()
 
 
+_CHAPTER = re.compile(
+    r"^\s*(?:chapter|chap\.|ch\.)\s*(?:\d+|[ivxlcdm]+|[a-z]+)?\b", re.I
+)
+_NON_CHAPTER = re.compile(
+    r"^\s*(?:contents|table of contents|title page|copyright|dedication|"
+    r"foreword|preface|introduction|acknowledg(?:e)?ments|about|appendix|"
+    r"notes|bibliography|index|afterword|epilogue|prologue|part\s+(?:\d+|[ivxlcdm]+|[a-z]+))\b",
+    re.I,
+)
+
+
+def _chapters(sections, navigation, headings):
+    """Infer starts only when available evidence has no obvious gaps."""
+    starts = set()
+    heading_text = {}
+    for section, offset, semantic in headings:
+        text = sections[section].text[offset:].split("\n", 1)[0].strip()
+        heading_text[(section, offset)] = text
+        if semantic or _CHAPTER.match(text):
+            starts.add((section, offset))
+    for entry in navigation:
+        if entry.section_position is None or entry.character_offset is None:
+            if _CHAPTER.match(entry.title):
+                return ()
+            continue
+        point = (entry.section_position, entry.character_offset)
+        title = entry.title.strip()
+        if _NON_CHAPTER.match(title):
+            continue
+        if _CHAPTER.match(title) or (
+            title and heading_text.get(point, "").casefold() == title.casefold()
+        ):
+            starts.add(point)
+    if any(
+        point not in starts and not _NON_CHAPTER.match(title)
+        for point, title in heading_text.items()
+    ):
+        return ()
+    numbers = []
+    for point in sorted(starts):
+        labels = [heading_text.get(point, "")]
+        labels.extend(
+            entry.title
+            for entry in navigation
+            if (entry.section_position, entry.character_offset) == point
+        )
+        numeric = [
+            int(match.group(1))
+            for label in labels
+            if (match := re.match(r"\s*(?:chapter|chap\.|ch\.)\s*(\d+)\b", label, re.I))
+        ]
+        if any(_CHAPTER.match(label) for label in labels) and not numeric:
+            return ()
+        if numeric and len(set(numeric)) != 1:
+            return ()
+        numbers.append(numeric[0] if numeric else None)
+    known = [(index, number) for index, number in enumerate(numbers) if number]
+    if any(number != index + 1 for index, number in known):
+        return ()
+    # ponytail: headings and TOC labels are heuristic; richer EPUB semantics can
+    # improve detection when books without recognizable chapter markers need it.
+    return tuple(sorted(starts))
+
+
 def read_epub(data: bytes) -> Book:
     """Parse a bounded EPUB without treating its spine items as confirmed chapters."""
     if len(data) > MAX_ARCHIVE_BYTES:
@@ -260,6 +341,7 @@ def read_epub(data: bytes) -> Book:
             }
             sections = []
             locations = {}
+            headings = []
             for ref in package.findall("./{*}spine/{*}itemref"):
                 if ref.get("linear", "yes") == "no":
                     continue
@@ -276,6 +358,12 @@ def read_epub(data: bytes) -> Book:
                 parser.feed(content.decode("utf-8-sig"))
                 text, anchors = parser.extract()
                 if text:
+                    headings.extend(
+                        (len(sections), offset, semantic)
+                        for marker, semantic in parser.headings
+                        if (offset := anchors.pop(marker, None)) is not None
+                        and offset < len(text)
+                    )
                     if path in locations:
                         locations[path] = None
                     else:
@@ -290,6 +378,7 @@ def read_epub(data: bytes) -> Book:
                 title=title or "Untitled book",
                 sections=tuple(sections),
                 navigation=navigation,
+                chapters=_chapters(sections, navigation, headings),
             )
     except InvalidEpub:
         raise

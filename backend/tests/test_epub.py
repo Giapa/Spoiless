@@ -142,3 +142,79 @@ def test_document_head_is_not_in_book_passages() -> None:
         )
     )
     assert book.sections[0].text == "Visible chapter"
+
+
+def test_detects_chapters_from_nested_navigation_and_headings():
+    package = """<package><manifest>
+      <item id="nav" href="toc.xhtml" properties="nav"
+        media-type="application/xhtml+xml"/>
+      <item id="front" href="front.xhtml" media-type="application/xhtml+xml"/>
+      <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
+      </manifest><spine><itemref idref="front"/><itemref idref="one"/>
+      </spine></package>"""
+    nav = """<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+      <nav epub:type="toc"><ol><li><a href="front.xhtml">Introduction</a></li>
+      <li><a href="one.xhtml">Part One</a><ol>
+      <li><a href="one.xhtml#one">Chapter 1</a></li>
+      <li><a href="one.xhtml#two">Chapter 2</a></li></ol></li>
+      </ol></nav></body></html>"""
+    book = read_epub(
+        epub(
+            extra={
+                "book/content.opf": package,
+                "book/toc.xhtml": nav,
+                "book/front.xhtml": "<h1>Introduction</h1><p>Front</p>",
+                "book/one.xhtml": '<h1 id="one">Chapter 1</h1><p>Read</p>'
+                '<h1 id="two">Chapter 2</h1><p>Unread</p>',
+            }
+        )
+    )
+    assert book.chapters == ((1, 0), (1, book.sections[1].text.index("Chapter 2")))
+
+
+def test_missing_navigation_detects_chapter_headings_or_uses_one_chapter():
+    book = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": "<h1>Preface</h1><p>Intro</p>",
+                "book/one.xhtml": "<h1>Chapter 1</h1><p>Read</p>"
+                "<h1>Chapter 2</h1><p>Unread</p>",
+            }
+        )
+    )
+    assert book.chapters == ((1, 0), (1, book.sections[1].text.index("Chapter 2")))
+    assert read_epub(epub()).chapters == ()
+
+
+def test_uncertain_chapter_boundaries_fail_closed():
+    book = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": "<h1>Preface</h1>",
+                "book/one.xhtml": "<h1>Chapter 1</h1><p>One</p>"
+                "<h1>Lost chapter</h1><p>Two</p>"
+                "<h1>Chapter 3</h1><p>Three</p>",
+            }
+        )
+    )
+    assert book.chapters == ()
+    gap = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": "<h1>Preface</h1>",
+                "book/one.xhtml": "<h1>Chapter 1</h1><p>One</p>"
+                "<h1>Chapter 3</h1><p>Three</p>",
+            }
+        )
+    )
+    assert gap.chapters == ()
+    roman = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": "<h1>Preface</h1>",
+                "book/one.xhtml": "<h1>Chapter I</h1><p>One</p>"
+                "<h1>Chapter III</h1><p>Three</p>",
+            }
+        )
+    )
+    assert roman.chapters == ()

@@ -68,7 +68,12 @@ async def import_book(request: Request) -> BookResponse:
     except InvalidEpub as exc:
         raise HTTPException(422, str(exc)) from exc
     book_id = library.add_book(book)
-    return BookResponse(id=book_id, title=book.title, section_count=len(book.sections))
+    return BookResponse(
+        id=book_id,
+        title=book.title,
+        section_count=len(book.sections),
+        chapters_confirmed=bool(book.chapters),
+    )
 
 
 @router.delete("/api/books/{book_id}", status_code=204)
@@ -134,7 +139,7 @@ class ProgressResponse(BaseModel):
 
 
 class ProgressRequest(BaseModel):
-    current_chapter: int = Field(ge=2, strict=True)
+    current_chapter: int = Field(ge=1, strict=True)
 
 
 @router.get("/api/books/{book_id}/progress", response_model=ProgressResponse)

@@ -33,7 +33,7 @@ def test_progress_boundary_and_reconfirmation(tmp_path, monkeypatch):
         "chapter_count": 3,
         "current_chapter": None,
     }
-    for value in (1, "2", True):
+    for value in (0, "2", True):
         with pytest.raises(ValidationError):
             ProgressRequest(current_chapter=value)
     with pytest.raises(HTTPException):
