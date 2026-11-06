@@ -51,9 +51,9 @@ test("reader recaps a completed chapter and sees a citation", async () => {
     assert.deepEqual((await chapter.locator("option").allTextContents()).map((text) => text.trim()), ["Choose a chapter", "Chapter 1"]);
     await chapter.selectOption("1");
     assert.match(await page.locator("body").innerText(), /selected chapter.*sent to OpenAI/i);
-    assert.match(await page.locator("body").innerText(), /longer recaps may use up to 11 AI requests/i);
+    assert.match(await page.locator("body").innerText(), /longer recaps use multiple AI requests/i);
     assert.match(await page.locator("body").innerText(), /may continue after you leave/i);
-    assert.match(await page.locator("body").innerText(), /240,000 characters/i);
+    assert.match(await page.locator("body").innerText(), /may count toward your usage limits/i);
     await page.getByRole("button", { name: "Create recap" }).click();
     const recap = page.getByRole("region", { name: "Recap" });
     await recap.getByText("Mira found the key.").waitFor();

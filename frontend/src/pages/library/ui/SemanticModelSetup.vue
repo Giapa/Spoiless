@@ -49,7 +49,9 @@ onMounted(load);
         </button>
       </template>
       <p v-else-if="!error" role="status">Checking model setup…</p>
-      <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Retry</button></p>
+      <p v-if="error" role="alert">
+        {{ error }} <button type="button" @click="load">Retry</button>
+      </p>
     </section>
   </details>
 </template>

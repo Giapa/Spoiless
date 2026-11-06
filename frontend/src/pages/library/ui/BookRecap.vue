@@ -116,9 +116,8 @@ onBeforeUnmount(() => {
         recaps may contain spoilers.
       </p>
       <p>
-        Recaps are not saved and clear when you leave this window. Longer recaps may use up to 11 AI
-        requests and may continue after you leave. Selections over 240,000 characters cannot be
-        recapped yet.
+        Recaps are not saved and clear when you leave this window. Longer recaps use multiple AI
+        requests, which may count toward your usage limits and may continue after you leave.
       </p>
       <p v-if="model">
         Using ChatGPT plan ·
