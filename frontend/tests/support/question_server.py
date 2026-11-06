@@ -4,10 +4,13 @@ import json
 import os
 import threading
 import time
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import httpx
 import uvicorn
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from src.chatgpt import accounts as chatgpt_accounts
@@ -15,7 +18,7 @@ from src.chatgpt import credentials as chatgpt_credentials
 from src.chatgpt.auth import VerifiedIdentity
 from src.chatgpt.credentials import CredentialRecord
 from src.library import storage as library
-from src.library.epub import Book, Section
+from src.library.epub import Book, NavigationEntry, Section
 from src.main import app
 
 
@@ -58,7 +61,11 @@ for suffix in ("a", "b", "c", "d"):
 long_recap = os.environ.get("SPOILESS_TEST_LONG_RECAP") == "1"
 text = "Mira found the key. " + ("a" * 24000 + " LAST_FACT" if long_recap else "")
 book_id = library.add_book(
-    Book("The Sample Book", (Section(text + "UNREAD_SECRET ending."),))
+    Book(
+        "The Sample Book",
+        (Section(text + "UNREAD_SECRET ending."),),
+        (NavigationEntry("The Lost Key", 0, 0),),
+    )
 )
 library.confirm_reading_units(
     book_id,
@@ -71,6 +78,21 @@ library.set_progress(book_id, 2)
 
 
 started = threading.Event()
+
+
+@app.get("/__test__/heading-epub")
+def heading_epub():
+    files = {
+        "mimetype": "application/epub+zip",
+        "META-INF/container.xml": '<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>',
+        "book.opf": '<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata><dc:title>Heading Book</dc:title></metadata><manifest><item id="one" href="one.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="one"/></spine></package>',
+        "one.xhtml": '<h1>Chapter 1: The Beginning</h1><p>Read</p><h1>Chapter 2: The End</h1><p>Unread</p>',
+    }
+    output = BytesIO()
+    with ZipFile(output, "w") as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    return Response(output.getvalue(), media_type="application/epub+zip")
 
 
 @app.get("/__test__/question_started")

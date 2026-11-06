@@ -46,7 +46,7 @@ test("available chapters can be selected without review", async () => {
     await page.getByText("Chapters available", { exact: false }).waitFor();
     assert.equal(await page.getByRole("button", { name: /review chapters/i }).count(), 0);
     const progress = page.getByRole("combobox", { name: "Current chapter" });
-    await progress.selectOption({ label: "Chapter 1" });
+    await progress.selectOption({ label: "Chapter 1: The Lost Key" });
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     assert.equal(await page.getByText("Ask about completed chapters").count(), 0);
@@ -242,5 +242,20 @@ test("an open history updates after asking and closes when leaving the window", 
     await history.getByText("Where was the key?").waitFor();
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
     await history.waitFor({ state: "hidden" });
+  } finally { await browser.close(); }
+});
+
+test("a newly imported book shows detected heading titles without review", async () => {
+  const { browser, page } = await openApp();
+  try {
+    const epub = await (await page.request.get(`http://127.0.0.1:${port}/__test__/heading-epub`)).body();
+    await page.locator('input[type="file"]').setInputFiles({ name: "headings.epub", mimeType: "application/epub+zip", buffer: epub });
+    const book = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Heading Book" }) });
+    await book.getByText("Chapters available", { exact: false }).waitFor();
+    const progress = book.getByRole("combobox", { name: "Current chapter" });
+    await progress.selectOption({ label: "Chapter 1: The Beginning" });
+    await book.getByRole("button", { name: "Save", exact: true }).click();
+    await book.getByText("Reading progress saved.").waitFor();
+    assert.equal(await book.getByRole("button", { name: /review/i }).count(), 0);
   } finally { await browser.close(); }
 });

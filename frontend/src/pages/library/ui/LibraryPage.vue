@@ -7,7 +7,6 @@ import SemanticModelSetup from "./SemanticModelSetup.vue";
 import ChatGPTConnection from "./ChatGPTConnection.vue";
 import ChatGPTModelPicker from "./ChatGPTModelPicker.vue";
 
-defineEmits<{ review: [book: { id: string; title: string }] }>();
 const selectedModel = ref("");
 const accountVersion = ref(0);
 const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = useLibrary();
@@ -33,7 +32,6 @@ const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = 
       :model="selectedModel"
       @retry="loadBooks"
       @delete="removeBook"
-      @review="$emit('review', $event)"
     />
     <ChatGPTConnection @account-changing="accountVersion++" />
     <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />

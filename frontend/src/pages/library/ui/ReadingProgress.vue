@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { z } from "zod";
+import { chapterTitles } from "../model/chapterTitles";
 
 const props = defineProps<{ bookId: string }>();
 const emit = defineEmits<{ availability: [ready: boolean]; completed: [count: number] }>();
@@ -9,6 +10,8 @@ const schema = z.object({
   current_chapter: z.number().int().nullable(),
 });
 const progress = ref<z.infer<typeof schema> | null>(null);
+const chapters = ref<string[]>([]);
+const titlesUnavailable = ref(false);
 const choice = ref("");
 const busy = ref(false);
 const loading = ref(false);
@@ -16,6 +19,26 @@ let loadVersion = 0;
 const error = ref("");
 const notice = ref("");
 const endpoint = `/api/books/${encodeURIComponent(props.bookId)}/progress`;
+const bookEndpoint = `/api/books/${encodeURIComponent(props.bookId)}`;
+
+async function loadChapterTitles() {
+  const location = z.object({
+    section_position: z.number().int().nonnegative().nullable(),
+    character_offset: z.number().int().nonnegative().nullable(),
+  });
+  const [unitsResponse, navigationResponse] = await Promise.all([
+    fetch(`${bookEndpoint}/reading-units`),
+    fetch(`${bookEndpoint}/navigation?include_titles=true`),
+  ]);
+  if (!unitsResponse.ok || !navigationResponse.ok) throw new Error();
+  const units = z
+    .array(location.extend({ kind: z.enum(["front_matter", "chapter"]) }))
+    .parse(await unitsResponse.json());
+  const entries = z
+    .array(location.extend({ title: z.string().nullable() }))
+    .parse(await navigationResponse.json());
+  return chapterTitles(units, entries);
+}
 
 async function load() {
   const version = ++loadVersion;
@@ -24,11 +47,16 @@ async function load() {
   error.value = "";
   notice.value = "";
   try {
-    const response = await fetch(endpoint);
+    const [response, titles] = await Promise.all([
+      fetch(endpoint),
+      loadChapterTitles().catch(() => null),
+    ]);
     if (!response.ok) throw new Error();
     const updated = schema.parse(await response.json());
     if (version !== loadVersion) return;
     progress.value = updated;
+    chapters.value = titles ?? [];
+    titlesUnavailable.value = titles === null;
     choice.value = progress.value.current_chapter?.toString() ?? "";
     emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
@@ -99,7 +127,7 @@ onBeforeUnmount(() => {
         >
           <option value="" disabled>Choose progress</option>
           <option v-for="chapter in progress.chapter_count" :key="chapter" :value="String(chapter)">
-            Chapter {{ chapter }}
+            {{ chapters[chapter - 1] || `Chapter ${chapter}` }}
           </option>
           <option :value="String(progress.chapter_count + 1)">Finished book</option>
         </select>
@@ -111,6 +139,9 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <p>The current chapter is treated as unread.</p>
+      <p v-if="titlesUnavailable" role="status">
+        Chapter titles could not be loaded. <button type="button" @click="load">Retry</button>
+      </p>
       <p>
         Automatic detection can miss or misidentify chapter boundaries, which could expose unread
         text. Check the source EPUB before relying on this selection.

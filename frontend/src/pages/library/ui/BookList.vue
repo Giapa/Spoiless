@@ -11,7 +11,7 @@ defineProps<{ books: Book[]; loading: boolean; busy: boolean; error: string; mod
 const searchAvailable = reactive<Record<string, boolean>>({});
 const historyVersion = reactive<Record<string, number>>({});
 const completedChapters = reactive<Record<string, number>>({});
-defineEmits<{ retry: []; delete: [book: Book]; review: [book: Book] }>();
+defineEmits<{ retry: []; delete: [book: Book] }>();
 </script>
 
 <template>

@@ -218,3 +218,38 @@ def test_uncertain_chapter_boundaries_fail_closed():
         )
     )
     assert roman.chapters == ()
+
+
+def test_unclassified_navigation_might_hide_a_chapter():
+    from src.library.epub import Section, _chapters
+
+    sections = (Section("Chapter 1\nRead\nAn untitled chapter\nUnread"),)
+    headings = ((0, 0, False),)
+    chapter = NavigationEntry("Chapter 1", 0, 0)
+    assert _chapters(sections, (chapter,), headings) == ((0, 0),)
+    assert (
+        _chapters(sections, (chapter, NavigationEntry("Untitled", 0, 15)), headings)
+        == ()
+    )
+    assert (
+        _chapters(
+            sections, (chapter, NavigationEntry("Untitled", None, None)), headings
+        )
+        == ()
+    )
+
+
+def test_detected_chapter_heading_is_available_as_title_without_navigation():
+    book = read_epub(
+        epub(
+            extra={
+                "book/two.xhtml": "<h1>Preface</h1>",
+                "book/one.xhtml": "<h1>Chapter 1</h1><p>Read</p>"
+                "<h1>Chapter 2</h1><p>Unread</p>",
+            }
+        )
+    )
+    assert book.navigation == (
+        NavigationEntry("Chapter 1", 1, 0),
+        NavigationEntry("Chapter 2", 1, book.sections[1].text.index("Chapter 2")),
+    )

@@ -274,6 +274,13 @@ def _chapters(sections, navigation, headings):
         for point, title in heading_text.items()
     ):
         return ()
+    # An unclassified TOC entry could be an otherwise unmarked chapter.
+    if any(
+        not _NON_CHAPTER.match(entry.title)
+        and (entry.section_position, entry.character_offset) not in starts
+        for entry in navigation
+    ):
+        return ()
     numbers = []
     for point in sorted(starts):
         labels = [heading_text.get(point, "")]
@@ -374,11 +381,28 @@ def read_epub(data: bytes) -> Book:
             navigation = _navigation(
                 archive, package_path, package, manifest, locations
             )
+            chapters = _chapters(sections, navigation, headings)
+            titled = {
+                (entry.section_position, entry.character_offset)
+                for entry in navigation
+                if entry.title.strip()
+            }
+            heading_points = {(section, offset) for section, offset, _ in headings}
+            navigation += tuple(
+                NavigationEntry(
+                    sections[section].text[offset:].split("\n", 1)[0].strip(),
+                    section,
+                    offset,
+                )
+                for section, offset in chapters
+                if (section, offset) in heading_points
+                and (section, offset) not in titled
+            )
             return Book(
                 title=title or "Untitled book",
                 sections=tuple(sections),
                 navigation=navigation,
-                chapters=_chapters(sections, navigation, headings),
+                chapters=chapters,
             )
     except InvalidEpub:
         raise
