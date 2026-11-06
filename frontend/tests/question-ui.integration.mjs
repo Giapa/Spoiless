@@ -100,7 +100,7 @@ test("AI chapter analysis can be retried and makes chapters available", async ()
     await page.reload();
     await page.getByRole("combobox", { name: "Book" }).selectOption({ label: "Unmapped Book" });
     await page.getByText("Chapters could not be detected", { exact: false }).waitFor();
-    await page.getByText(/full book, including unread text/i).waitFor();
+    await page.getByText(/short passages around uncertain boundaries/i).waitFor();
     assert.equal(await page.getByRole("button", { name: "Analyze chapters" }).isDisabled(), true);
     await page.getByText("Account and model", { exact: true }).click();
     await page.getByRole("button", { name: "Load available models" }).click();

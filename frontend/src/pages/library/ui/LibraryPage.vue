@@ -72,10 +72,7 @@ watch(
           <ChatGPTConnection @account-changing="accountVersion++" />
           <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />
         </details>
-        <details class="settings">
-          <summary>Local search settings</summary>
-          <SemanticModelSetup />
-        </details>
+        <SemanticModelSetup />
       </div>
     </aside>
     <BookList

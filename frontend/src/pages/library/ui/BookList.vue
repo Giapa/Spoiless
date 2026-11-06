@@ -85,9 +85,9 @@ onBeforeUnmount(() => {
       <div v-if="!book.chapters_confirmed" class="unavailable">
         <h3>Chapters could not be detected</h3>
         <p>
-          Analyze this book with AI to look for chapter boundaries. The full book, including unread
-          text, will be sent to OpenAI. AI can miss chapters, including unmarked boundaries, and may
-          expose unread text. Analysis supports books up to 400,000 characters.
+          Analyze the book for chapter boundaries. Short passages around uncertain boundaries,
+          including unread text, may be sent to OpenAI. Detection can miss chapters, including
+          unmarked boundaries, and may expose unread text.
         </p>
         <p v-if="!model">Connect an account and choose a model in Account and model first.</p>
         <button type="button" :disabled="!model || analyzing" @click="analyzeChapters">

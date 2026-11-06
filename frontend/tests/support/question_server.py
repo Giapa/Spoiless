@@ -103,7 +103,7 @@ def question_started():
 @app.post("/__test__/unmapped-book")
 def unmapped_book():
     book_id = library.add_book(
-        Book("Unmapped Book", (Section("First chapter text.\nSecond chapter text."),))
+        Book("Unmapped Book", (Section("First chapter text."), Section("Second chapter text.")))
     )
     return {"id": book_id}
 
@@ -141,16 +141,11 @@ def fake_openai(self, request):
     ):
         body = json.loads(request.content)
         prompt = body["input"][0]["content"]
-        if prompt.startswith("Identify every actual chapter start"):
+        if prompt.startswith("Determine whether the start of 'after'"):
             answer = json.dumps(
                 {"uncertain": True}
                 if body["model"] == "a2"
-                else {
-                    "chapters": [
-                        {"section": 0, "start": "First chapter text."},
-                        {"section": 0, "start": "Second chapter text."},
-                    ]
-                }
+                else {"boundary": True}
             )
             delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
             return httpx.Response(

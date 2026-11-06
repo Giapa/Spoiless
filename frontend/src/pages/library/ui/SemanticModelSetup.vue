@@ -37,22 +37,34 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="model" aria-labelledby="model-heading">
-    <h2 id="model-heading">Semantic search setup</h2>
-    <p>Semantic search will find passages by meaning. The English model runs on this device.</p>
-    <p v-if="ready">Model downloaded. You can search by meaning in a book with saved progress.</p>
-    <template v-else-if="ready === false">
-      <p>The one-time model download is approximately 90 MB. No book text is sent.</p>
-      <button type="button" :disabled="busy" @click="download">
-        {{ busy ? "Downloading model…" : "Download model" }}
-      </button>
-    </template>
-    <p v-else-if="!error" role="status">Checking model setup…</p>
-    <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Retry</button></p>
-  </section>
+  <details v-if="ready !== true" class="settings">
+    <summary>Local search settings</summary>
+    <section class="model" aria-labelledby="model-heading">
+      <h2 id="model-heading">Semantic search setup</h2>
+      <p>Semantic search will find passages by meaning. The English model runs on this device.</p>
+      <template v-if="ready === false">
+        <p>The one-time model download is approximately 90 MB. No book text is sent.</p>
+        <button type="button" :disabled="busy" @click="download">
+          {{ busy ? "Downloading model…" : "Download model" }}
+        </button>
+      </template>
+      <p v-else-if="!error" role="status">Checking model setup…</p>
+      <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Retry</button></p>
+    </section>
+  </details>
 </template>
 
 <style scoped>
+.settings {
+  border-top: 1px solid #d6ded4;
+  padding-top: 12px;
+}
+summary {
+  min-height: 36px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
 .model {
   margin-top: 12px;
   padding: 16px;

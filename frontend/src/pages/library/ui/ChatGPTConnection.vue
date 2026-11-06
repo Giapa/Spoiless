@@ -187,21 +187,24 @@ onUnmounted(() => {
     <p v-if="state?.status === 'connected' && !state.plan_usage_enabled">
       This account did not grant ChatGPT plan usage.
     </p>
-    <dialog
-      v-if="noticeAccount"
-      ref="noticeDialog"
-      aria-labelledby="plan-notice-title"
-      @cancel.prevent
-    >
-      <h3 id="plan-notice-title">You’re using your ChatGPT plan</h3>
-      <p>
-        Eligible AI requests in Spoiless will use your ChatGPT plan. You can manage usage in
-        <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer"
-          >ChatGPT settings</a
-        >.
-      </p>
-      <button type="button" @click="dismissPlanNotice">Got it</button>
-    </dialog>
+    <Teleport to="body">
+      <dialog
+        v-if="noticeAccount"
+        ref="noticeDialog"
+        class="plan-notice"
+        aria-labelledby="plan-notice-title"
+        @cancel.prevent="dismissPlanNotice"
+      >
+        <h3 id="plan-notice-title">You’re using your ChatGPT plan</h3>
+        <p>
+          Eligible AI requests in Spoiless will use your ChatGPT plan. You can manage usage in
+          <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer"
+            >ChatGPT settings</a
+          >.
+        </p>
+        <button type="button" @click="dismissPlanNotice">Got it</button>
+      </dialog>
+    </Teleport>
     <p v-if="revocationUnconfirmed" role="alert">
       Signed out locally, but we could not confirm remote revocation. Disconnect Spoiless in
       <a
@@ -290,5 +293,47 @@ button {
   background: #222;
   color: white;
   white-space: normal;
+}
+.plan-notice {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 28px;
+  border: 1px solid #dce1d8;
+  border-radius: 16px;
+  background: #fff;
+  color: #202521;
+  box-shadow: 0 20px 60px rgb(24 39 29 / 20%);
+}
+.plan-notice::backdrop {
+  background: rgb(24 39 29 / 48%);
+}
+.plan-notice h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+.plan-notice p {
+  margin: 12px 0 20px;
+  line-height: 1.6;
+}
+.plan-notice a {
+  color: #315b45;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+.plan-notice button {
+  margin: 0;
+  background: #315b45;
+  border-color: #315b45;
+  cursor: pointer;
+}
+.plan-notice button:hover {
+  background: #254b37;
+}
+.plan-notice button:focus-visible {
+  outline: 3px solid #8aab94;
+  outline-offset: 2px;
 }
 </style>
