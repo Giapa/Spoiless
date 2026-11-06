@@ -76,7 +76,13 @@ def _client() -> httpx.Client:
 
 
 def _json_request(
-    client: httpx.Client, method: str, url: str, *, refresh=False, **kwargs
+    client: httpx.Client,
+    method: str,
+    url: str,
+    *,
+    refresh=False,
+    max_response_bytes=MAX_RESPONSE_BYTES,
+    **kwargs,
 ) -> dict:
     try:
         with client.stream(
@@ -86,7 +92,7 @@ def _json_request(
                 response.raise_for_status()
             body = bytearray()
             for chunk in response.iter_bytes():
-                if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                if len(body) + len(chunk) > max_response_bytes:
                     raise ValueError("Response too large")
                 body.extend(chunk)
         result = json.loads(body)

@@ -15,7 +15,9 @@ def list_available_models(account_id: str) -> list[dict[str, str]]:
     try:
         with _client() as client:
             client.headers["Authorization"] = f"Bearer {token}"
-            result = _json_request(client, "GET", f"{RESOURCE}/models")
+            result = _json_request(
+                client, "GET", f"{RESOURCE}/models", max_response_bytes=2 * 1024 * 1024
+            )
         models = result["models"]
         if not isinstance(models, list):
             raise ValueError

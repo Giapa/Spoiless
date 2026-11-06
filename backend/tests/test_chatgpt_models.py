@@ -84,6 +84,44 @@ def test_model_list_uses_account_token_and_preserves_display_order(
     assert requests[0].headers["authorization"] == "Bearer secret-access"
 
 
+@pytest.mark.parametrize("size, accepted", [(700_000, True), (2_100_000, False)])
+def test_model_catalog_allows_large_but_bounded_responses(
+    saved_account, monkeypatch, size, accepted
+):
+    from src.chatgpt.models import ModelCatalogError
+
+    real_client = httpx.Client
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    json={
+                        "models": [
+                            {
+                                "slug": "model",
+                                "display_name": "Model",
+                                "visibility": "list",
+                            }
+                        ],
+                        "metadata": "x" * size,
+                    },
+                )
+            ),
+            **kwargs,
+        ),
+    )
+    if accepted:
+        assert list_available_models(saved_account) == [
+            {"slug": "model", "display_name": "Model"}
+        ]
+    else:
+        with pytest.raises(ModelCatalogError):
+            list_available_models(saved_account)
+
+
 def test_identity_only_account_cannot_request_plan_model_catalog(tmp_path, monkeypatch):
     from src.chatgpt.accounts import AccountError
 
