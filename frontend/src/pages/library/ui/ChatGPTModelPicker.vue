@@ -110,8 +110,8 @@ async function loadModels() {
 
 <style scoped>
 .models {
-  margin-top: 24px;
-  padding: 20px 24px;
+  margin-top: 12px;
+  padding: 16px;
   background: #fff;
   border: 1px solid #e2e2e2;
   border-radius: 8px;
@@ -132,11 +132,12 @@ label {
 }
 select {
   font: inherit;
-  max-width: 100%;
+  width: 100%;
   min-height: 44px;
   padding: 8px;
 }
 button {
+  width: 100%;
   font: inherit;
   min-height: 44px;
   padding: 8px 16px;

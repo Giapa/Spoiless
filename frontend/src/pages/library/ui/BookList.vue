@@ -143,6 +143,9 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #e3e7e1;
   padding-bottom: 20px;
 }
+.chat-header > div {
+  min-width: 0;
+}
 h2,
 h3,
 p {
@@ -163,6 +166,7 @@ h3 {
   margin-bottom: 6px;
 }
 .delete {
+  flex-shrink: 0;
   background: transparent;
   border: 0;
   color: #59675d;
@@ -213,6 +217,10 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 0 24px;
+}
+.tools > * {
+  flex: 1 1 260px;
+  min-width: 0;
 }
 @media (max-width: 700px) {
   .chat {

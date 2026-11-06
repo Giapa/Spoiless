@@ -54,8 +54,8 @@ onMounted(load);
 
 <style scoped>
 .model {
-  margin-top: 24px;
-  padding: 20px 24px;
+  margin-top: 12px;
+  padding: 16px;
   background: #fff;
   border: 1px solid #e2e2e2;
   border-radius: 8px;
@@ -70,6 +70,7 @@ p {
   font-size: 14px;
 }
 button {
+  max-width: 100%;
   font: inherit;
   min-height: 44px;
   padding: 8px 16px;

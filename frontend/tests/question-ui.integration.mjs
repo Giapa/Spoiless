@@ -29,17 +29,50 @@ after(async () => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-async function openApp() {
+async function openApp({ viewport, openAccount = true } = {}) {
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  const page = await browser.newPage(viewport ? { viewport } : {});
   page.setDefaultTimeout(6000);
   for (let tries = 0; ; tries++) {
     try { await page.goto(`http://127.0.0.1:${port}`); break; }
     catch (error) { if (tries >= 50) throw error; await new Promise((r) => setTimeout(r, 100)); }
   }
-  await page.getByText("Account and model", { exact: true }).click();
+  if (openAccount) await page.getByText("Account and model", { exact: true }).click();
   return { browser, page };
 }
+
+test("library sidebar can be toggled on desktop and phone", async () => {
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    const { browser, page } = await openApp({ viewport: { width, height }, openAccount: false });
+    try {
+      const sidebar = page.locator("#library-sidebar");
+      const initiallyOpen = width > 390;
+      const toggle = page.getByRole("button", { name: initiallyOpen ? "Hide sidebar" : "Show sidebar" });
+      assert.equal(await toggle.getAttribute("aria-expanded"), String(initiallyOpen));
+      assert.equal(await sidebar.isVisible(), initiallyOpen);
+      await toggle.focus();
+      await page.keyboard.press("Enter");
+      const changedToggle = page.getByRole("button", { name: initiallyOpen ? "Show sidebar" : "Hide sidebar" });
+      assert.equal(await changedToggle.getAttribute("aria-expanded"), String(!initiallyOpen));
+      assert.equal(await sidebar.isVisible(), !initiallyOpen);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      await changedToggle.click();
+      assert.equal(await sidebar.isVisible(), initiallyOpen);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+      if (!initiallyOpen) await page.getByRole("button", { name: "Show sidebar" }).click();
+      await page.getByText("Account and model", { exact: true }).click();
+      const overlaps = await sidebar.evaluate((element) => {
+        const controls = [...element.querySelectorAll("button, select")]
+          .map((control) => control.getBoundingClientRect())
+          .filter((rect) => rect.width && rect.height);
+        return controls.some((a, index) => controls.slice(index + 1).some((b) =>
+          a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom));
+      });
+      assert.equal(overlaps, false);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    } finally { await browser.close(); }
+  }
+});
 
 test("available chapters can be selected without review", async () => {
   const { browser, page } = await openApp();

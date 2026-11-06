@@ -251,8 +251,8 @@ onUnmounted(() => {
 
 <style scoped>
 .connection {
-  margin-top: 24px;
-  padding: 20px 24px;
+  margin-top: 12px;
+  padding: 16px;
   background: #fff;
   border: 1px solid #e2e2e2;
   border-radius: 8px;
@@ -265,6 +265,7 @@ p {
   margin: 8px 0;
   color: #555;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 label {
   display: block;
@@ -273,11 +274,14 @@ label {
 }
 select {
   font: inherit;
-  max-width: 100%;
+  width: 100%;
   min-height: 44px;
   padding: 8px;
 }
 button {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
   font: inherit;
   min-height: 44px;
   padding: 8px 16px;
@@ -285,5 +289,6 @@ button {
   border-radius: 6px;
   background: #222;
   color: white;
+  white-space: normal;
 }
 </style>

@@ -166,6 +166,9 @@ label {
   margin-top: 6px;
   flex-wrap: wrap;
 }
+select {
+  flex: 1 1 220px;
+}
 select,
 button {
   font: inherit;
@@ -186,5 +189,6 @@ p {
   margin: 6px 0 0;
   color: #555;
   font-size: 14px;
+  line-height: 1.5;
 }
 </style>
