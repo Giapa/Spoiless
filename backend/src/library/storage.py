@@ -82,6 +82,51 @@ class BookNotFound(ValueError):
     """The requested book is not in the local library."""
 
 
+class ChapterMapChanged(Exception):
+    """The book already has a map or changed during analysis."""
+
+
+def save_analyzed_chapters(book_id, sections, chapters):
+    """Save only if the analyzed book still exists unchanged and has no map."""
+    with connect() as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute(
+            "SELECT position, text FROM sections WHERE book_id = ? ORDER BY position",
+            (book_id,),
+        ).fetchall()
+        if not current:
+            raise BookNotFound("Book not found.")
+        if (
+            current != sections
+            or db.execute(
+                "SELECT 1 FROM reading_units WHERE book_id = ? LIMIT 1", (book_id,)
+            ).fetchone()
+        ):
+            raise ChapterMapChanged("Chapter boundaries changed; please retry.")
+        _insert_detected_units(db, book_id, chapters)
+        # Use actual book text for displayed titles, never generated titles.
+        navigation_position = db.execute(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM navigation_entries "
+            "WHERE book_id = ?",
+            (book_id,),
+        ).fetchone()[0]
+        for position, offset in chapters:
+            if not db.execute(
+                "SELECT 1 FROM navigation_entries WHERE book_id = ? "
+                "AND section_position = ? "
+                "AND character_offset = ? AND title != ''",
+                (book_id, position, offset),
+            ).fetchone():
+                title = current[position][1][offset:].split("\n", 1)[0][:200]
+                db.execute(
+                    "INSERT INTO navigation_entries "
+                    "(book_id, position, title, section_position, character_offset) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (book_id, navigation_position, title, position, offset),
+                )
+                navigation_position += 1
+
+
 def get_navigation(book_id: str) -> list[NavigationEntry]:
     """Return ordered, unconfirmed navigation links, including unresolved links."""
     with connect() as db:

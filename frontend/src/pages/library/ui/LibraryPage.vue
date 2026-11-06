@@ -37,7 +37,7 @@ watch(
         <option v-for="book in books" :key="book.id" :value="book.id">{{ book.title }}</option>
       </select>
       <AddBookButton :disabled="busy || loading" :busy="busy" @select="addBook" />
-      <p class="hint">EPUB files stay on this device. Maximum 25 MB.</p>
+      <p class="hint">EPUB files are stored on this device. Maximum 25 MB.</p>
       <p v-if="error" class="message error" role="alert">
         {{ error }} <button type="button" @click="loadBooks">Retry</button>
       </p>
@@ -59,6 +59,7 @@ watch(
       :busy="busy"
       :model="selectedModel"
       @delete="removeBook"
+      @chapters-analyzed="loadBooks"
     />
   </main>
 </template>

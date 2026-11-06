@@ -100,6 +100,14 @@ def question_started():
     return {"started": started.is_set()}
 
 
+@app.post("/__test__/unmapped-book")
+def unmapped_book():
+    book_id = library.add_book(
+        Book("Unmapped Book", (Section("First chapter text.\nSecond chapter text."),))
+    )
+    return {"id": book_id}
+
+
 def fake_openai(self, request):
     if request.url == "https://api.openai.com/v1/models":
         token = request.headers.get("authorization")
@@ -133,6 +141,27 @@ def fake_openai(self, request):
     ):
         body = json.loads(request.content)
         prompt = body["input"][0]["content"]
+        if prompt.startswith("Identify every actual chapter start"):
+            answer = json.dumps(
+                {"uncertain": True}
+                if body["model"] == "a2"
+                else {
+                    "chapters": [
+                        {"section": 0, "start": "First chapter text."},
+                        {"section": 0, "start": "Second chapter text."},
+                    ]
+                }
+            )
+            delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                text=(
+                    f"data: {delta}\n\n"
+                    'data: {"type":"response.completed",'
+                    '"response":{"status":"completed"}}\n\n'
+                ),
+            )
         if long_recap and body["model"] == "a1":
             payload = json.loads(prompt.split("\n", 1)[1])
             if "UNREAD_SECRET" in prompt:

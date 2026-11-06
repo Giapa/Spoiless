@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onBeforeUnmount, ref } from "vue";
+import { z } from "zod";
 import PassageSearch from "./PassageSearch.vue";
 import BookQuestion from "./BookQuestion.vue";
 import ConversationHistory from "./ConversationHistory.vue";
@@ -7,11 +8,55 @@ import BookRecap from "./BookRecap.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
 
-defineProps<{ book?: Book; loading: boolean; busy: boolean; model: string }>();
-defineEmits<{ delete: [book: Book] }>();
+const props = defineProps<{ book?: Book; loading: boolean; busy: boolean; model: string }>();
+const emit = defineEmits<{ delete: [book: Book]; chaptersAnalyzed: [] }>();
 const searchAvailable = ref(false);
 const historyVersion = ref(0);
 const completedChapters = ref(0);
+const analyzing = ref(false);
+const analysisError = ref("");
+let analysisRequest: AbortController | null = null;
+
+async function analyzeChapters() {
+  if (!props.book || !props.model || analyzing.value) return;
+  const controller = new AbortController();
+  analysisRequest = controller;
+  analyzing.value = true;
+  analysisError.value = "";
+  try {
+    const response = await fetch(
+      `/api/books/${encodeURIComponent(props.book.id)}/analyze-chapters`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
+        body: JSON.stringify({ model: props.model, confirm: true }),
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) {
+      const detail = z
+        .object({ detail: z.string() })
+        .safeParse(await response.json().catch(() => null));
+      throw new Error(
+        detail.success ? detail.data.detail : "Could not analyze chapters. Please try again.",
+      );
+    }
+    if (analysisRequest === controller) emit("chaptersAnalyzed");
+  } catch (error) {
+    if (analysisRequest === controller)
+      analysisError.value =
+        error instanceof Error ? error.message : "Could not analyze chapters. Please try again.";
+  } finally {
+    if (analysisRequest === controller) {
+      analysisRequest = null;
+      analyzing.value = false;
+    }
+  }
+}
+onBeforeUnmount(() => {
+  analysisRequest?.abort();
+  analysisRequest = null;
+});
 </script>
 
 <template>
@@ -40,9 +85,16 @@ const completedChapters = ref(0);
       <div v-if="!book.chapters_confirmed" class="unavailable">
         <h3>Chapters could not be detected</h3>
         <p>
-          Books imported before this update need to be imported again. If detection still fails,
-          this book cannot be used for chapter-based search.
+          Analyze this book with AI to look for chapter boundaries. The full book, including unread
+          text, will be sent to OpenAI. AI can miss chapters, including unmarked boundaries, and may
+          expose unread text. Analysis supports books up to 400,000 characters.
         </p>
+        <p v-if="!model">Connect an account and choose a model in Account and model first.</p>
+        <button type="button" :disabled="!model || analyzing" @click="analyzeChapters">
+          {{ analyzing ? "Analyzing chapters…" : "Analyze chapters" }}
+        </button>
+        <p v-if="analyzing" role="status">Analyzing chapter boundaries…</p>
+        <p v-if="analysisError" role="alert">{{ analysisError }}</p>
       </div>
       <template v-else>
         <div class="reading">
@@ -141,6 +193,21 @@ h3 {
   margin-top: 10px;
   color: #5e6b61;
   line-height: 1.6;
+}
+.unavailable button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  min-height: 44px;
+  border: 1px solid #315b45;
+  border-radius: 6px;
+  color: white;
+  background: #315b45;
+  font: inherit;
+  cursor: pointer;
+}
+.unavailable button:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .tools {
   display: flex;

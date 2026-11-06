@@ -57,20 +57,32 @@ test("available chapters can be selected without review", async () => {
   } finally { await browser.close(); }
 });
 
-test("unavailable chapter detection explains reimport without review", async () => {
+test("AI chapter analysis can be retried and makes chapters available", async () => {
   const { browser, page } = await openApp();
+  let bookId;
   try {
-    await page.route("**/api/books", async (route) => {
-      const response = await route.fetch();
-      const books = await response.json();
-      await route.fulfill({ response, json: books.map((book) => ({ ...book, chapters_confirmed: false })) });
-    });
+    const response = await page.request.post(`http://127.0.0.1:${port}/__test__/unmapped-book`);
+    assert.equal(response.ok(), true);
+    bookId = (await response.json()).id;
     await page.reload();
+    await page.getByRole("combobox", { name: "Book" }).selectOption({ label: "Unmapped Book" });
     await page.getByText("Chapters could not be detected", { exact: false }).waitFor();
-    await page.getByText(/books imported before this update/i).waitFor();
+    await page.getByText(/full book, including unread text/i).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Analyze chapters" }).isDisabled(), true);
+    await page.getByText("Account and model", { exact: true }).click();
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a2");
+    await page.getByRole("button", { name: "Analyze chapters" }).click();
+    await page.getByRole("alert").getByText("Could not verify chapter boundaries. Please retry.").waitFor();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    await page.getByRole("button", { name: "Analyze chapters" }).click();
+    await page.getByRole("combobox", { name: "Current chapter" }).waitFor();
+    assert.equal(await page.getByRole("combobox", { name: "Current chapter" }).locator("option").count(), 4);
     assert.equal(await page.getByRole("button", { name: /review chapters/i }).count(), 0);
-    assert.equal(await page.getByRole("combobox", { name: "Current chapter" }).count(), 0);
-  } finally { await browser.close(); }
+  } finally {
+    if (bookId) await page.request.delete(`http://127.0.0.1:${port}/api/books/${bookId}`, { headers: { Origin: `http://127.0.0.1:${port}`, "X-Spoiless-Action": "1" } });
+    await browser.close();
+  }
 });
 
 
