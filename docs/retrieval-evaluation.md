@@ -5,12 +5,14 @@ The evaluation uses *The Inland Compass*, an original, fictional six-chapter sto
 Run the offline keyword evaluation from the project root:
 
 ```sh
+cd backend
 uv run python scripts/evaluate_retrieval.py
 ```
 
 To include hybrid search, first use **Download model** in the app, then run:
 
 ```sh
+cd backend
 uv run python scripts/evaluate_retrieval.py --hybrid
 ```
 
@@ -29,6 +31,7 @@ This deliberately tiny fixture is useful for regression checks and comparing cha
 Run the local API evaluation against simulated OpenAI responses:
 
 ```sh
+cd backend
 uv run pytest -q tests/test_answer_evaluation.py
 ```
 

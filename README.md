@@ -11,13 +11,14 @@ The library is stored in `$XDG_DATA_HOME/spoiless/library.sqlite3`, or `~/.local
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
+cd backend
 uv sync --group dev
-uv run uvicorn spoiless.main:app --reload
+uv run uvicorn src.main:app --reload
 ```
 
 The health endpoint is available at `http://127.0.0.1:8000/api/health`.
 
-The backend API starts in `src/spoiless/main.py`. ChatGPT API routes, sign-in, credentials, accounts, model discovery, and inference are grouped in `src/spoiless/chatgpt/`. Book question and recap API routes, conversation history, and citation validation are grouped in `src/spoiless/book_assistant/`. Passage retrieval, its API routes, and local semantic model setup are grouped in `src/spoiless/retrieval/`. Library API routes, EPUB import, and library storage are grouped in `src/spoiless/library/`, with the shared database connection in `src/spoiless/database.py`.
+The backend API starts in `backend/src/main.py`. ChatGPT API routes, sign-in, credentials, accounts, model discovery, and inference are grouped in `backend/src/chatgpt/`. Book question and recap API routes, conversation history, and citation validation are grouped in `backend/src/book_assistant/`. Passage retrieval, its API routes, and local semantic model setup are grouped in `backend/src/retrieval/`. Library API routes, EPUB import, and library storage are grouped in `backend/src/library/`, with the shared database connection in `backend/src/database.py`.
 See [architecture and data flow](docs/architecture.md) for retrieval, LangChain, and safety boundaries.
 
 ```sh
@@ -36,7 +37,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL shown by Vite. Run `npm run build` to check types and create a production build, `npm run lint` for Oxlint, and `npm run format:check` for Oxfmt. For browser tests, install Chromium once with `npx playwright install chromium`, then run `npm run test:browser`. Run `npm run test:integration` for browser tests against an isolated local API with simulated OpenAI and keyring services; the backend dependencies must be installed with `uv sync --group dev` first.
+Open the local URL shown by Vite. Run `npm run build` to check types and create a production build, `npm run lint` for Oxlint, and `npm run format:check` for Oxfmt. For browser tests, install Chromium once with `npx playwright install chromium`, then run `npm run test:browser`. Run `npm run test:integration` for browser tests against an isolated local API with simulated OpenAI and keyring services; the backend dependencies must be installed with `cd backend && uv sync --group dev` first.
 
 The frontend follows Feature-Sliced Design. `src/App.vue` provides the app shell; `src/pages/library` groups the library page's `ui`, `model`, and `api` code. Import the needed file directly; slices may only depend on lower layers. Add layers and slices when the application needs them.
 
@@ -56,7 +57,7 @@ An offline keyword-search API uses LangChain’s local text splitter to divide e
 
 ## Sample and evaluation
 
-The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story that can be redistributed. Run `uv run python scripts/evaluate_retrieval.py` for offline keyword and boundary checks. Add `--hybrid` only after downloading the model in the app. Run `uv run pytest -q tests/test_answer_evaluation.py` for the offline local API answer and recap safety evaluation. See [the evaluation notes](docs/retrieval-evaluation.md) for results and limitations. EPUBs imported before the document-head fix may need to be deleted and reimported to remove metadata from their stored text.
+The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story that can be redistributed. From `backend`, run `uv run python scripts/evaluate_retrieval.py` for offline keyword and boundary checks. Add `--hybrid` only after downloading the model in the app. Run `uv run pytest -q tests/test_answer_evaluation.py` for the offline local API answer and recap safety evaluation. See [the evaluation notes](docs/retrieval-evaluation.md) for results and limitations. EPUBs imported before the document-head fix may need to be deleted and reimported to remove metadata from their stored text.
 
 ## ChatGPT connection
 

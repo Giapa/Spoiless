@@ -16,9 +16,9 @@ const port = await new Promise((resolvePort, reject) => {
   });
 });
 const dataDir = mkdtempSync(join(tmpdir(), "spoiless-question-test-"));
-const python = process.env.SPOILESS_TEST_PYTHON || execFileSync("uv", ["run", "--project", "..", "python", "-c", "import sys; print(sys.executable)"], { encoding: "utf8" }).trim();
+const python = process.env.SPOILESS_TEST_PYTHON || execFileSync("uv", ["run", "--project", "../backend", "python", "-c", "import sys; print(sys.executable)"], { encoding: "utf8" }).trim();
 const server = spawn(python, ["tests/support/question_server.py"], {
-  env: { ...process.env, XDG_DATA_HOME: dataDir, SPOILESS_TEST_PORT: String(port), PYTHONPATH: resolve("../src") },
+  env: { ...process.env, XDG_DATA_HOME: dataDir, SPOILESS_TEST_PORT: String(port), PYTHONPATH: resolve("../backend") },
   stdio: "inherit",
 });
 after(async () => {

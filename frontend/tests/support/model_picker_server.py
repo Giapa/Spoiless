@@ -8,11 +8,11 @@ import httpx
 import uvicorn
 from fastapi.staticfiles import StaticFiles
 
-from spoiless.chatgpt import accounts as chatgpt_accounts
-from spoiless.chatgpt import credentials as chatgpt_credentials
-from spoiless.chatgpt.auth import VerifiedIdentity
-from spoiless.chatgpt.credentials import CredentialRecord
-from spoiless.main import app
+from src.chatgpt import accounts as chatgpt_accounts
+from src.chatgpt import credentials as chatgpt_credentials
+from src.chatgpt.auth import VerifiedIdentity
+from src.chatgpt.credentials import CredentialRecord
+from src.main import app
 
 
 class MemoryKeyring:
