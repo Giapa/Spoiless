@@ -1,14 +1,33 @@
 # Spoiless
 
-A local-first reading companion in development. Spoiless is intended to answer questions about books using only chapters the reader has completed.
+A local-first reading companion for EPUB books. Tell Spoiless where you are in a book, then ask questions or request a recap about the chapters you have finished.
 
-You can import and delete EPUBs in a local library. Readers can confirm chapters and record their progress. ChatGPT sign-in and experimental single-question answers are available for testing; real-account inference is not yet verified. The EPUB importer is conservative and may reject some valid files, including those with encryption metadata. See [TASKS.md](TASKS.md) for the reviewable roadmap and [HANDOFF.md](HANDOFF.md) for the agreed product scope.
+Spoiless is an **experimental project in development**. It is designed to limit the book text used for answers to completed chapters, but it cannot guarantee a spoiler-free or accurate response. Chapter detection can also miss or misidentify boundaries, so check them against your EPUB before relying on them.
 
-The library is stored in `$XDG_DATA_HOME/spoiless/library.sqlite3`, or `~/.local/share/spoiless/library.sqlite3` if `XDG_DATA_HOME` is unset.
+## What you can do
 
-## Backend
+- Import EPUB books into a local library and choose your current chapter.
+- Ask questions and follow up in a conversation about completed chapters.
+- Request a recap of a completed chapter or the story through a completed chapter.
+- See quotes from the book alongside supported answers.
+- Use a local search model to find relevant passages by words and meaning.
 
-Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
+Your current chapter is treated as **unread**. Select **Finished book** when you have completed it. Changing your selection saves progress automatically and starts a new conversation; older conversations are hidden, not deleted, until you delete the book.
+
+## Getting started
+
+### Requirements
+
+- Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
+- Node.js 22.12 or newer and npm
+- An internet connection for setup and AI responses
+- A ChatGPT account with access to a supported model, and an available operating-system credential store
+
+The ChatGPT connection and answer flow are experimental. Sign-in has been exercised with a real account, while real-account model access and inference have not yet been verified. Account eligibility and availability may vary. On Linux, unlock your system keyring before connecting.
+
+### 1. Start the backend
+
+From the project root:
 
 ```sh
 cd backend
@@ -16,20 +35,11 @@ uv sync --group dev
 uv run uvicorn src.main:app --reload
 ```
 
-The health endpoint is available at `http://127.0.0.1:8000/api/health`.
+Leave this terminal running. The backend health check is at <http://127.0.0.1:8000/api/health>.
 
-The backend API starts in `backend/src/main.py`. ChatGPT API routes, sign-in, credentials, accounts, model discovery, and inference are grouped in `backend/src/chatgpt/`. Book question and recap API routes, conversation history, and citation validation are grouped in `backend/src/book_assistant/`. Passage retrieval, its API routes, and local semantic model setup are grouped in `backend/src/retrieval/`. Library API routes, EPUB import, and library storage are grouped in `backend/src/library/`, with the shared database connection in `backend/src/database.py`.
-See [architecture and data flow](docs/architecture.md) for retrieval, LangChain, and safety boundaries.
+### 2. Start the frontend
 
-```sh
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-```
-
-## Frontend
-
-Requires Node.js 22.12+ and npm. With the backend running, open a second terminal:
+Open a second terminal in the project root:
 
 ```sh
 cd frontend
@@ -37,28 +47,70 @@ npm ci
 npm run dev
 ```
 
-Open the local URL shown by Vite. Run `npm run build` to check types and create a production build, `npm run lint` for Oxlint, and `npm run format:check` for Oxfmt. For browser tests, install Chromium once with `npx playwright install chromium`, then run `npm run test:browser`. Run `npm run test:integration` for browser tests against an isolated local API with simulated OpenAI and keyring services; the backend dependencies must be installed with `cd backend && uv sync --group dev` first.
+Open the local URL printed by Vite. Keep both terminals running while using the app.
 
-The frontend follows Feature-Sliced Design. `src/App.vue` provides the app shell; `src/pages/library` groups the library page's `ui`, `model`, and `api` code. Import the needed file directly; slices may only depend on lower layers. Add layers and slices when the application needs them.
+### 3. Add a book and start a conversation
 
-## Public showcase
+1. Add an EPUB using the library sidebar. You can try the included [sample book](examples/the-inland-compass.epub). EPUB uploads are limited to 25 MB; the importer may reject some files, including files with encryption metadata.
+2. Select the chapter you are currently reading. The app uses the chapters before it as completed text. If chapters cannot be detected, the app offers an AI-assisted analysis; read its warning before proceeding.
+3. Under **Local search settings**, download the English search model. This is a one-time download of approximately 90 MB and runs locally.
+4. Under **Account and model**, connect your ChatGPT account, load the available models, and select one.
+5. Ask a question, such as “Who found the key?” or “Summarize chapter 1.” You can ask follow-up questions in the same conversation.
 
-The static showcase is separate from the local app. Preview it with `python3 -m http.server 8001 --directory showcase`, then open `http://localhost:8001`. The root `netlify.toml` publishes the `showcase` directory when the project is connected to Netlify; the showcase does not host the local backend.
+The local search setup does not send book text when downloading the model. Answer and recap requests send information to OpenAI as described below.
 
-## Reading progress
+## How Spoiless handles your book
 
-After confirming a book's chapters, choose your current chapter and save it in the library. The current chapter is treated as unread; select **Finished book** to include all chapters. Changing chapter boundaries clears the saved progress, so choose it again. Chapter review can show unread text when you explicitly open the manual review.
+Your library, reading progress, cached search embeddings, and conversations are stored in a local SQLite database at `$XDG_DATA_HOME/spoiless/library.sqlite3`, or `~/.local/share/spoiless/library.sqlite3` when `XDG_DATA_HOME` is unset. ChatGPT credentials are stored separately in the operating system credential store.
 
-Experimental questions use eligible keyword-retrieved passages. Questions and validated answers are stored locally and can be reviewed in the conversation history. Up to four recent question-and-answer turns (at most 4,000 characters total) may be sent to OpenAI as context for a follow-up; readers can request a recap of a completed chapter or the book through that chapter. Long selections are processed in stages, with up to 11 AI requests; selections over 240,000 characters are not supported yet. Moving progress backward or confirming chapters again hides the old conversation and starts a fresh one. Hidden conversations remain stored until the book is deleted. The eligible-text boundary is tested locally but is not a guarantee against future model-generated spoilers.
+For a question, Spoiless searches completed text locally using keyword and semantic retrieval. It may send your question, relevant completed passages, and up to four recent conversation turns to OpenAI. A recap can send the selected completed text in multiple requests. AI-assisted chapter analysis can send short passages around uncertain boundaries, including unread text.
 
-## Retrieval in progress
+Before displaying a generated answer, Spoiless checks that cited quotes match the supplied text and checks reading progress around generation. These checks reduce risk but do not prove that every claim is supported or prevent model-generated spoilers. If progress changes after a request has started, text already sent cannot be recalled.
 
-Search and book questions combine keyword and semantic rankings over completed text. Download the local English search model in Local search settings before searching or asking questions; the one-time download is approximately 90 MB and book text stays on your device for retrieval. Eligible passages are split locally, and their embeddings are cached in the library database and reused only when the passage and model version match. The keyword index is rebuilt for each search. Deleting a book deletes its stored embeddings. Results are discarded if eligible text changes during retrieval, and the question workflow checks again before and after inference. Real hybrid retrieval quality and CPU use have not yet been evaluated.
+Search quality, resource use, and real-account model behavior still need further evaluation. Recap intent detection may miss some phrasings, especially when a question has no matching passages.
 
-## Sample and evaluation
+## Development
 
-The [sample EPUB](examples/the-inland-compass.epub) is a short fictional story that can be redistributed. From `backend`, run `uv run python scripts/evaluate_retrieval.py` for offline keyword and boundary checks. Add `--hybrid` only after downloading the model in the app. Run `uv run pytest -q tests/test_answer_evaluation.py` for the offline local API answer and recap safety evaluation. See [the evaluation notes](docs/retrieval-evaluation.md) for results and limitations. EPUBs imported before the document-head fix may need to be deleted and reimported to remove metadata from their stored text.
+### Backend checks
 
-## ChatGPT connection
+From `backend`:
 
-The sign-in request, local callback listener, token exchange and identity verification are tested offline with a simulated server. Linux secure credential storage has passed a temporary save/read/delete check on the development machine, and a local registry can remember and reauthorize verified account registrations through backend controls. Backend token refresh is covered by offline tests. The library includes a sign-in interface and a model picker. The project owner reports manually signing in and out with a real account; model access and inference remain unverified. To try it on Linux, start both servers above, unlock your system keyring, and choose **Continue with ChatGPT** in the library. Complete the approval in the browser that opens, then return to Spoiless. Availability depends on your account and OpenAI’s preview eligibility; select a model and use “Ask about completed chapters” after saving reading progress to try a single answer. Real-account inference and model eligibility are unverified; answers are saved locally and may contain spoilers. See [the sign-in notes](docs/chatgpt-auth.md) for the remaining work.
+```sh
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+```
+
+### Frontend checks
+
+From `frontend`:
+
+```sh
+npm test
+npm run lint
+npm run format:check
+npm run build
+```
+
+For browser tests, install Chromium once with `npx playwright install chromium`, then run `npm run test:browser`. Run `npm run test:integration` for browser tests against an isolated local API with simulated OpenAI and credential services. Install the backend development dependencies first.
+
+### Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `backend/src/library/` | EPUB import, chapters, reading progress, and library storage |
+| `backend/src/retrieval/` | Passage retrieval and local search model setup |
+| `backend/src/book_assistant/` | Questions, recaps, conversation history, and citations |
+| `backend/src/chatgpt/` | ChatGPT sign-in, accounts, models, and inference |
+| `frontend/src/pages/library/` | Vue library and conversation interface |
+| `examples/` | Sample EPUB for trying the app |
+| `showcase/` | Separate static product showcase |
+
+The frontend uses Feature-Sliced Design. The static showcase can be previewed with `python3 -m http.server 8001 --directory showcase` and opened at <http://localhost:8001>; it does not host the local backend.
+
+## More information
+
+- [Retrieval evaluation](docs/retrieval-evaluation.md) — test methods and limitations.
+- [ChatGPT connection notes](docs/chatgpt-auth.md) — sign-in and account implementation details.
+- [Architecture](docs/architecture.md) and [answer safety](docs/answer-safety.md) — background on data flow and safeguards. Some details in these notes describe earlier iterations and may lag behind the current code.
+- [Sample book notes](examples/README.md) — information about the included EPUB.
