@@ -26,6 +26,15 @@ function scrollToLatest() {
     if (transcript.value) transcript.value.scrollTop = transcript.value.scrollHeight;
   });
 }
+function scrollToLatestQuestion() {
+  void nextTick(() => {
+    const container = transcript.value;
+    const question = container?.querySelector(".turns > li:last-child > .question");
+    if (container && question) {
+      container.scrollTop += question.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    }
+  });
+}
 function setThinking(value: boolean) {
   thinking.value = value;
   if (value) scrollToLatest();
@@ -138,7 +147,7 @@ onBeforeUnmount(() => {
               v-if="searchAvailable || current"
               :book-id="book.id"
               :version="historyVersion"
-              @loaded="scrollToLatest"
+              @loaded="scrollToLatestQuestion"
             />
             <div v-else class="empty">
               <h3>Choose your current chapter</h3>

@@ -434,3 +434,34 @@ test("conversation scrolls while the composer stays in place", async () => {
     } finally { await browser.close(); }
   }
 });
+
+test("a new long answer starts at its question", async () => {
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    const { browser, page } = await openApp({ viewport: { width, height }, openAccount: false });
+    try {
+      let answered = false;
+      await page.route("**/conversation", (route) => route.fulfill({ json: answered
+        ? [{ question: "Where is the key?", answer: "A long answer. ".repeat(500), citations: [] }]
+        : [] }));
+      await page.route("**/answer", (route) => {
+        answered = true;
+        return route.fulfill({ json: { answer: "A long answer.", citations: [] } });
+      });
+      if (width === 390) await page.getByRole("button", { name: "Show sidebar" }).click();
+      await page.getByRole("button", { name: "Load available models" }).click();
+      await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+      if (width === 390) await page.getByRole("button", { name: "Hide sidebar" }).click();
+      await page.getByRole("textbox", { name: "Your question" }).fill("Where is the key?");
+      await page.getByRole("button", { name: "Ask", exact: true }).click();
+      const question = page.getByRole("region", { name: "Conversation history" }).getByText("Where is the key?");
+      await question.waitFor();
+      await page.waitForTimeout(100);
+      const visible = await question.evaluate((element) => {
+        const questionBounds = element.getBoundingClientRect();
+        const transcriptBounds = element.closest(".transcript").getBoundingClientRect();
+        return questionBounds.top >= transcriptBounds.top - 1 && questionBounds.bottom <= transcriptBounds.bottom + 1;
+      });
+      assert.equal(visible, true, `question should be visible at ${width}px`);
+    } finally { await browser.close(); }
+  }
+});
