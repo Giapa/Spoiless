@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
+import { nextTick, onBeforeUnmount, ref } from "vue";
 import { z } from "zod";
 import BookQuestion from "./BookQuestion.vue";
 import ConversationHistory from "./ConversationHistory.vue";
@@ -10,6 +10,17 @@ const props = defineProps<{ book?: Book; loading: boolean; busy: boolean; model:
 const emit = defineEmits<{ delete: [book: Book]; chaptersAnalyzed: [] }>();
 const searchAvailable = ref(false);
 const historyVersion = ref(0);
+const thinking = ref(false);
+const transcript = ref<HTMLElement | null>(null);
+function scrollToLatest() {
+  void nextTick(() => {
+    if (transcript.value) transcript.value.scrollTop = transcript.value.scrollHeight;
+  });
+}
+function setThinking(value: boolean) {
+  thinking.value = value;
+  if (value) scrollToLatest();
+}
 const analyzing = ref(false);
 const analysisError = ref("");
 let analysisRequest: AbortController | null = null;
@@ -101,19 +112,36 @@ onBeforeUnmount(() => {
             @changed="historyVersion++"
           />
         </div>
-        <div v-if="searchAvailable" class="conversation">
-          <ConversationHistory :book-id="book.id" :version="historyVersion" />
-          <BookQuestion :book-id="book.id" :model="model" @saved="historyVersion++" />
-        </div>
-        <div v-else class="conversation">
-          <div class="empty">
-            <h3>Choose your current chapter</h3>
-            <p>
-              Save your reading progress to chat about completed chapters. Your current chapter
-              stays unread.
-            </p>
+        <div class="conversation">
+          <div ref="transcript" class="transcript" tabindex="0" aria-label="Conversation messages">
+            <ConversationHistory
+              v-if="searchAvailable"
+              :book-id="book.id"
+              :version="historyVersion"
+              @loaded="scrollToLatest"
+            />
+            <div v-else class="empty">
+              <h3>Choose your current chapter</h3>
+              <p>
+                Choose your reading progress to chat about completed chapters. Your current chapter
+                stays unread.
+              </p>
+            </div>
+            <div v-if="thinking" class="thinking" role="status">
+              <span class="spinner" aria-hidden="true"></span>
+              <span
+                ><strong>Thinking…</strong><br />Reading your completed chapters and preparing an
+                answer.</span
+              >
+            </div>
           </div>
-          <BookQuestion :book-id="book.id" :model="model" disabled />
+          <BookQuestion
+            :book-id="book.id"
+            :model="model"
+            :disabled="!searchAvailable"
+            @saved="historyVersion++"
+            @thinking="setThinking"
+          />
         </div>
       </template>
     </template>
@@ -123,7 +151,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .chat {
   min-width: 0;
-  padding: 32px clamp(20px, 5vw, 72px) 48px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 24px clamp(20px, 5vw, 72px) 16px;
 }
 .chat-header {
   display: flex;
@@ -169,12 +201,59 @@ h3 {
 }
 .reading,
 .conversation {
+  width: 100%;
   max-width: 800px;
   margin: 0 auto;
 }
 .reading {
-  padding: 8px 0 18px;
+  flex: none;
+  max-height: 28dvh;
+  overflow-y: auto;
+  padding: 8px 0 12px;
   border-bottom: 1px solid #e3e7e1;
+}
+.conversation {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #eef4ee;
+  color: #315b45;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 2px solid #b8cbbb;
+  border-top-color: #315b45;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 .empty,
 .unavailable {
@@ -205,14 +284,8 @@ h3 {
 }
 @media (max-width: 700px) {
   .chat {
-    padding: 24px 16px 40px;
-  }
-  .conversation {
-    display: flex;
-    flex-direction: column;
-  }
-  .conversation :deep(.question) {
-    order: -1;
+    flex: 1;
+    padding: 16px 16px 12px;
   }
   h2 {
     font-size: 21px;

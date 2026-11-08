@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string; model: string; disabled?: boolean }>();
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; thinking: [value: boolean] }>();
 const question = ref("");
 const busy = ref(false);
 const error = ref("");
@@ -23,6 +23,7 @@ function clear() {
   request?.abort();
   request = null;
   busy.value = false;
+  emit("thinking", false);
   error.value = "";
 }
 async function ask() {
@@ -31,6 +32,7 @@ async function ask() {
   const controller = new AbortController();
   request = controller;
   busy.value = true;
+  emit("thinking", true);
   try {
     const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/answer`, {
       method: "POST",
@@ -65,10 +67,20 @@ async function ask() {
     if (request === controller) {
       request = null;
       busy.value = false;
+      emit("thinking", false);
     }
   }
 }
 watch(() => props.model, clear);
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) {
+      clear();
+      question.value = "";
+    }
+  },
+);
 onBeforeUnmount(() => {
   clear();
 });
@@ -82,9 +94,9 @@ onBeforeUnmount(() => {
         :id="`question-${bookId}`"
         v-model="question"
         maxlength="500"
-        :disabled="disabled"
+        :disabled="disabled || busy"
         required
-        @input="clear"
+        @input="error = ''"
       />
       <p>
         Your question, relevant completed passages and recent conversation may be sent to OpenAI.
@@ -96,28 +108,21 @@ onBeforeUnmount(() => {
           >Manage usage</a
         >
       </p>
-      <p v-if="disabled">Save progress beyond the first chapter to start a conversation.</p>
+      <p v-if="disabled">Choose a chapter beyond the first chapter to start a conversation.</p>
       <p v-if="!model">Choose a model in Account and model to ask a question.</p>
       <button type="submit" :disabled="disabled || busy || !model || !question.trim()">
         {{ busy ? "Asking…" : "Ask" }}
       </button>
     </form>
-    <div v-if="busy" class="thinking" role="status">
-      <span class="spinner" aria-hidden="true"></span>
-      <span
-        ><strong>Thinking…</strong><br />Reading your completed chapters and preparing an
-        answer.</span
-      >
-    </div>
     <p v-if="error" role="alert">{{ error }}</p>
   </section>
 </template>
 
 <style scoped>
 .question {
-  margin-top: 20px;
+  margin-top: 8px;
   max-width: 800px;
-  padding: 18px;
+  padding: 12px;
   border: 1px solid #ccd6cc;
   border-radius: 16px;
   background: white;
@@ -140,7 +145,9 @@ button {
   background: white;
 }
 textarea {
-  min-height: 88px;
+  height: 64px;
+  min-height: 64px;
+  max-height: 20dvh;
   resize: vertical;
 }
 button {
@@ -153,37 +160,6 @@ p {
   font-size: 14px;
   margin: 6px 0;
   color: #555;
-}
-.thinking {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 10px;
-  background: #eef4ee;
-  color: #315b45;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.spinner {
-  width: 20px;
-  height: 20px;
-  flex: none;
-  border: 2px solid #b8cbbb;
-  border-top-color: #315b45;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
 }
 .answer,
 blockquote {

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string; version: number }>();
+const emit = defineEmits<{ loaded: [] }>();
 const schema = z.array(
   z.object({
     question: z.string(),
@@ -47,6 +48,8 @@ async function load() {
     if (request === controller) {
       request = null;
       loading.value = false;
+      await nextTick();
+      emit("loaded");
     }
   }
 }

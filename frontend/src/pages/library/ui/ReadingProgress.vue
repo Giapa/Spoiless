@@ -69,7 +69,7 @@ async function load() {
   }
 }
 async function save() {
-  if (!choice.value) return;
+  if (!choice.value || Number(choice.value) === progress.value?.current_chapter) return;
   ++loadVersion;
   loading.value = false;
   busy.value = true;
@@ -87,17 +87,11 @@ async function save() {
     notice.value = "Reading progress saved.";
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
   } catch {
-    error.value = "Could not save reading progress. Try again.";
+    await load();
+    error.value = "Could not save reading progress. Check the selection and try again.";
   } finally {
     busy.value = false;
   }
-}
-function changeChoice() {
-  notice.value = "";
-  emit(
-    "availability",
-    Number(choice.value) > 1 && Number(choice.value) === progress.value?.current_chapter,
-  );
 }
 function refresh() {
   if (!busy.value) void load();
@@ -115,14 +109,14 @@ onBeforeUnmount(() => {
 <template>
   <div class="progress">
     <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Retry</button></p>
-    <form v-if="progress && progress.chapter_count" @submit.prevent="save">
+    <div v-if="progress && progress.chapter_count">
       <label :for="`progress-${bookId}`">Current chapter</label>
       <div class="controls">
         <select
           :id="`progress-${bookId}`"
           v-model="choice"
           :disabled="busy || loading"
-          @change="changeChoice"
+          @change="save"
         >
           <option value="" disabled>Choose progress</option>
           <option v-for="chapter in progress.chapter_count" :key="chapter" :value="String(chapter)">
@@ -130,12 +124,6 @@ onBeforeUnmount(() => {
           </option>
           <option :value="String(progress.chapter_count + 1)">Finished book</option>
         </select>
-        <button
-          type="submit"
-          :disabled="busy || loading || !choice || Number(choice) === progress.current_chapter"
-        >
-          Save
-        </button>
       </div>
       <p>The current chapter is treated as unread.</p>
       <p v-if="titlesUnavailable" role="status">
@@ -146,7 +134,7 @@ onBeforeUnmount(() => {
         text. Check the source EPUB before relying on this selection.
       </p>
       <p v-if="notice" role="status">{{ notice }}</p>
-    </form>
+    </div>
   </div>
 </template>
 

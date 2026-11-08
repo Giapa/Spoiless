@@ -89,14 +89,17 @@ watch(
 
 <style scoped>
 .workspace {
-  min-height: 100vh;
+  height: 100dvh;
   display: grid;
+  overflow: hidden;
   grid-template-columns: 360px minmax(0, 1fr);
   background: #faf9f6;
   color: #202521;
 }
 .sidebar {
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: 24px 20px;
   background: #eef1ea;
   border-right: 1px solid #dce1d8;
@@ -200,9 +203,12 @@ button {
 }
 @media (max-width: 700px) {
   .workspace {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
   .sidebar {
+    flex: none;
+    max-height: 35dvh;
     padding: 18px 16px;
     border-right: 0;
     border-bottom: 1px solid #dce1d8;

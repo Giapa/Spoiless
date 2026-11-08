@@ -81,11 +81,9 @@ test("available chapters can be selected without review", async () => {
     assert.equal(await page.getByRole("button", { name: /review chapters/i }).count(), 0);
     const progress = page.getByRole("combobox", { name: "Current chapter" });
     await progress.selectOption({ label: "Chapter 1: The Lost Key" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     assert.equal(await page.getByText("Ask about completed chapters").count(), 0);
     await progress.selectOption({ label: "Chapter 2" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
   } finally { await browser.close(); }
 });
@@ -139,7 +137,6 @@ test("moving progress backward hides an in-flight answer", async () => {
   try {
     const progress = page.getByRole("combobox", { name: "Current chapter" });
     await progress.selectOption({ label: "Finished book" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a3");
@@ -147,7 +144,6 @@ test("moving progress backward hides an in-flight answer", async () => {
     await page.getByRole("button", { name: "Ask" }).click();
     await page.waitForFunction(async () => (await (await fetch("/__test__/question_started")).json()).started);
     await progress.selectOption({ label: "Chapter 2" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     await page.waitForTimeout(1800);
     assert.equal((await page.locator("body").innerText()).includes("UNREAD_SECRET"), false);
@@ -189,6 +185,9 @@ test("changing progress clears an already displayed answer", async () => {
     await page.getByText("Mira found the key.").waitFor();
     await page.getByRole("combobox", { name: "Current chapter" }).selectOption({ label: "Finished book" });
     await page.getByText("Mira found the key.").waitFor({ state: "hidden" });
+    await page.getByText("Reading progress saved.").waitFor();
+    await page.getByRole("combobox", { name: "Current chapter" }).selectOption("2");
+    await page.getByText("Reading progress saved.").waitFor();
   } finally { await browser.close(); }
 });
 
@@ -235,7 +234,6 @@ test("moving backward hides the old conversation even after moving forward again
   try {
     const progress = page.getByRole("combobox", { name: "Current chapter" });
     await progress.selectOption({ label: "Finished book" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a3");
@@ -245,12 +243,10 @@ test("moving backward hides the old conversation even after moving forward again
     const history = page.getByRole("region", { name: "Conversation history" });
     await history.getByText(/UNREAD_SECRET/).first().waitFor();
     await progress.selectOption({ label: "Chapter 2" });
-    assert.equal(await history.count(), 0);
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await history.getByText("No questions in this conversation yet.").waitFor();
     await page.getByText("Reading progress saved.").waitFor();
     await history.getByText("No questions in this conversation yet.").waitFor();
     await progress.selectOption({ label: "Finished book" });
-    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByText("Reading progress saved.").waitFor();
     await history.getByText("No questions in this conversation yet.").waitFor();
   } finally { await browser.close(); }
@@ -262,8 +258,7 @@ test("an open history remains visible after leaving the window", async () => {
     const progress = page.getByRole("combobox", { name: "Current chapter" });
     if (await progress.inputValue() !== "2") {
       await progress.selectOption({ label: "Chapter 2" });
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await page.getByText("Reading progress saved.").waitFor();
+        await page.getByText("Reading progress saved.").waitFor();
     }
     const history = page.getByRole("region", { name: "Conversation history" });
     await page.getByRole("button", { name: "Load available models" }).click();
@@ -288,7 +283,6 @@ test("a newly imported book shows detected heading titles without review", async
     await book.getByRole("heading", { name: "Heading Book" }).waitFor();
     const progress = book.getByRole("combobox", { name: "Current chapter" });
     await progress.selectOption({ label: "Chapter 1: The Beginning" });
-    await book.getByRole("button", { name: "Save", exact: true }).click();
     await book.getByText("Reading progress saved.").waitFor();
     assert.equal(await book.getByRole("button", { name: /review/i }).count(), 0);
     await page.getByRole("combobox", { name: "Book" }).selectOption({ label: "The Sample Book" });
@@ -337,4 +331,51 @@ test("first imported book is selected in an empty library", async () => {
     await page.getByRole("heading", { name: "Heading Book" }).waitFor();
     assert.notEqual(await page.getByRole("combobox", { name: "Book" }).inputValue(), "");
   } finally { await browser.close(); }
+});
+
+test("chapter changes save automatically and recover from a failed save", async () => {
+  const { browser, page } = await openApp({ openAccount: false });
+  try {
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    await progress.waitFor();
+    await progress.selectOption("3");
+    await page.getByText("Reading progress saved.").waitFor();
+    assert.equal(await page.getByRole("button", { name: "Save", exact: true }).count(), 0);
+    await page.reload();
+    await progress.waitFor();
+    assert.equal(await progress.inputValue(), "3");
+    await page.route("**/progress", async (route) => {
+      if (route.request().method() === "PUT") await route.fulfill({ status: 500 });
+      else await route.continue();
+    });
+    await progress.selectOption("2");
+    await page.getByRole("alert").getByText(/could not save reading progress/i).waitFor();
+    assert.equal(await progress.inputValue(), "3");
+  } finally { await browser.close(); }
+});
+
+test("conversation scrolls while the composer stays in place", async () => {
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    const { browser, page } = await openApp({ viewport: { width, height }, openAccount: false });
+    try {
+      await page.route("**/conversation", async (route) => {
+        await route.fulfill({ json: Array.from({ length: 20 }, (_, i) => ({ question: `Question ${i}`, answer: `Answer ${i}`, citations: [] })) });
+      });
+      await page.reload();
+      const history = page.getByRole("region", { name: "Conversation history" });
+      await history.getByText("Question 19").waitFor();
+      const scroll = page.locator(".transcript");
+      const composer = page.getByRole("textbox", { name: "Your question" });
+      const before = await composer.boundingBox();
+      await page.waitForFunction(() => document.querySelector(".transcript")?.scrollTop > 0);
+      const dimensions = await scroll.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollTop: el.scrollTop }));
+      assert.ok(dimensions.scrollHeight > dimensions.clientHeight);
+      assert.ok(dimensions.scrollTop > 0);
+      await scroll.evaluate((el) => { el.scrollTop = 0; });
+      const after = await composer.boundingBox();
+      assert.equal(after.y, before.y);
+      assert.ok(after.y + after.height <= height);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    } finally { await browser.close(); }
+  }
 });
