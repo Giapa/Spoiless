@@ -15,6 +15,11 @@ const completed = ref(0);
 const current = ref<number | null>(null);
 const historyVersion = ref(0);
 const thinking = ref(false);
+const summaryQuestion = ref("");
+function setSummaryThinking(question: string) {
+  summaryQuestion.value = question;
+  if (question) scrollToLatest();
+}
 const transcript = ref<HTMLElement | null>(null);
 function scrollToLatest() {
   void nextTick(() => {
@@ -117,12 +122,20 @@ onBeforeUnmount(() => {
             @current="current = $event"
             @changed="historyVersion++"
           />
-          <BookRecap :book-id="book.id" :model="model" :completed="completed" :current="current" />
+          <BookRecap
+            :book-id="book.id"
+            :model="model"
+            :completed="completed"
+            :current="current"
+            :disabled="thinking"
+            @thinking="setSummaryThinking"
+            @saved="historyVersion++"
+          />
         </div>
         <div class="conversation">
           <div ref="transcript" class="transcript" tabindex="0" aria-label="Conversation messages">
             <ConversationHistory
-              v-if="searchAvailable"
+              v-if="searchAvailable || current"
               :book-id="book.id"
               :version="historyVersion"
               @loaded="scrollToLatest"
@@ -141,11 +154,21 @@ onBeforeUnmount(() => {
                 answer.</span
               >
             </div>
+            <div v-if="summaryQuestion" class="pending-summary">
+              <p class="summary-question">{{ summaryQuestion }}</p>
+              <div class="thinking" role="status" aria-live="polite">
+                <span class="spinner" aria-hidden="true"></span>
+                <span
+                  ><strong>Thinking…</strong><br />Creating summary… Longer summaries may take a few
+                  minutes.</span
+                >
+              </div>
+            </div>
           </div>
           <BookQuestion
             :book-id="book.id"
             :model="model"
-            :disabled="!searchAvailable"
+            :disabled="!searchAvailable || !!summaryQuestion"
             @saved="historyVersion++"
             @thinking="setThinking"
           />
@@ -242,6 +265,14 @@ h3 {
   color: #315b45;
   font-size: 14px;
   line-height: 1.5;
+}
+.pending-summary {
+  border-top: 1px solid #e3e7e1;
+  padding-top: 16px;
+}
+.summary-question {
+  font-size: 14px;
+  font-weight: 600;
 }
 .spinner {
   width: 20px;

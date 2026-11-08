@@ -3,6 +3,7 @@ import json
 import pytest
 
 from src.book_assistant import recaps
+from src.database import connect
 from src.library import storage
 from src.library.epub import Book, Section
 from src.retrieval.search import ProgressChanged
@@ -128,9 +129,21 @@ def test_current_chapter_summary_excludes_other_chapters(tmp_path, monkeypatch):
 
     monkeypatch.setattr(recaps, "generate_response", generate)
     result = recaps.recap_chapter(
-        book, "account", "model", 2, require_citations=False, include_current=True
+        book,
+        "account",
+        "model",
+        2,
+        require_citations=False,
+        include_current=True,
+        save_turn=True,
     )
     assert result.answer == "Current summary."
+    with connect() as db:
+        assert db.execute(
+            "SELECT question, answer, citations FROM conversation_turns "
+            "WHERE book_id = ?",
+            (book,),
+        ).fetchone() == ("Summarize chapter 2.", "Current summary.", "[]")
     with pytest.raises(ValueError):
         recaps.recap_chapter(
             book, "account", "model", 3, require_citations=False, include_current=True

@@ -32,6 +32,7 @@ def recap_chapter(
     *,
     require_citations: bool = True,
     include_current: bool = False,
+    save_turn: bool = False,
 ) -> ValidatedAnswer:
     with connect() as observer:
         version = observer.execute("PRAGMA data_version").fetchone()[0]
@@ -76,6 +77,24 @@ def recap_chapter(
             if observer.execute("PRAGMA data_version").fetchone()[0] != version:
                 raise ProgressChanged("Reading progress changed; retry the recap.")
 
+        def finish(answer: str) -> ValidatedAnswer:
+            if save_turn:
+                question = (
+                    f"Summarize chapter {chapter}."
+                    if mode == "chapter"
+                    else f"Summarize from the beginning before chapter {chapter + 1}."
+                )
+                observer.execute("BEGIN IMMEDIATE")
+                verify_boundary()
+                observer.execute(
+                    "INSERT INTO conversation_turns "
+                    "(book_id, question, answer, citations) "
+                    "VALUES (?, ?, ?, '[]')",
+                    (book_id, question, answer),
+                )
+                observer.commit()
+            return ValidatedAnswer(answer, ())
+
         if not require_citations:
 
             def summarize(parts: list[str], *, intermediate: bool) -> str:
@@ -106,7 +125,7 @@ def recap_chapter(
 
             text = "\n".join(p.text for p in passages)
             if len(text) <= 24000:
-                return ValidatedAnswer(summarize([text], intermediate=False), ())
+                return finish(summarize([text], intermediate=False))
             summaries = [
                 summarize([text[i : i + 24000]], intermediate=True)
                 for i in range(0, len(text), 24000)
@@ -116,7 +135,7 @@ def recap_chapter(
                     summarize(summaries[i : i + 10], intermediate=True)
                     for i in range(0, len(summaries), 10)
                 ]
-            return ValidatedAnswer(summarize(summaries, intermediate=False), ())
+            return finish(summarize(summaries, intermediate=False))
 
         instructions = (
             "Summarize the supplied passages using only their contents. Include "

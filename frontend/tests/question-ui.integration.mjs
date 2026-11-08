@@ -123,6 +123,7 @@ test("summary buttons choose the current chapter or the text before it", async (
     await page.getByRole("button", { name: "Load available models" }).click();
     await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
     for (const [name, mode, chapter, current] of [["Summarize this chapter", "chapter", 2, true], ["Summarize before current chapter", "through", 1, false]]) {
+      await page.setViewportSize({ width: mode === "chapter" ? 1440 : 390, height: 844 });
       const request = page.waitForRequest((req) => req.url().endsWith("/recap") && req.method() === "POST");
       await page.getByRole("button", { name }).click();
       const body = (await request).postDataJSON();
@@ -130,8 +131,44 @@ test("summary buttons choose the current chapter or the text before it", async (
       assert.equal(body.mode, mode);
       assert.equal(body.include_current, current);
       assert.equal(body.require_citations, false);
-      await page.getByRole("region", { name: "Summary" }).getByText("A summary.").waitFor();
+      assert.equal(body.save_turn, true);
+      const pending = page.getByRole("status").filter({ hasText: "Creating summary" });
+      await pending.waitFor();
+      assert.equal(await pending.isVisible(), true);
+      const bounds = await pending.boundingBox();
+      assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 844);
+      const turn = page.getByRole("region", { name: "Conversation history" }).getByRole("listitem").filter({ hasText: mode === "chapter" ? "Summarize chapter 2." : "Summarize from the beginning before chapter 2." });
+      await turn.getByText("A summary.", { exact: true }).waitFor();
+      await pending.waitFor({ state: "hidden" });
+      assert.equal(await page.getByRole("region", { name: "Summary" }).count(), 0);
+      assert.equal(await page.getByRole("button", { name }).isEnabled(), true);
     }
+    await page.reload();
+    const history = page.getByRole("region", { name: "Conversation history" });
+    await history.getByText("Summarize chapter 2.", { exact: true }).waitFor();
+    await history.getByText("Summarize from the beginning before chapter 2.", { exact: true }).waitFor();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    if (await page.getByRole("button", { name: "Show sidebar" }).count()) await page.getByRole("button", { name: "Show sidebar" }).click();
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    const progress = page.getByRole("combobox", { name: "Current chapter" });
+    await progress.selectOption("1");
+    await page.getByText("Reading progress saved.").waitFor();
+    assert.equal(await page.getByRole("button", { name: "Summarize before current chapter" }).isDisabled(), true);
+    await page.getByRole("button", { name: "Summarize this chapter" }).click();
+    await history.getByText("Summarize chapter 1.", { exact: true }).waitFor();
+    await history.getByText("A summary.", { exact: true }).waitFor();
+    await page.route("**/recap", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await route.fulfill({ status: 502, json: { detail: "Could not create the summary. Please retry." } });
+    });
+    await page.getByRole("button", { name: "Summarize this chapter" }).click();
+    await page.getByRole("status").filter({ hasText: "Creating summary" }).waitFor();
+    await page.getByRole("alert").getByText("Could not create the summary. Please retry.").waitFor();
+    assert.equal(await page.getByRole("status").filter({ hasText: "Creating summary" }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: "Summarize this chapter" }).isEnabled(), true);
+    await progress.selectOption("2");
+    await page.getByText("Reading progress saved.").waitFor();
   } finally { await browser.close(); }
 });
 

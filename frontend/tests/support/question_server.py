@@ -167,6 +167,7 @@ def fake_openai(self, request):
                 ),
             )
         if prompt.startswith("Summarize the supplied text") and body["model"] == "a1":
+            time.sleep(0.7)
             answer = json.dumps({"answer": "A summary."})
             delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
             return httpx.Response(

@@ -53,7 +53,7 @@ def conversation(
         except library.BookNotFound:
             raise HTTPException(404, "Book not found.") from None
         if progress.current_chapter is None or not (
-            2 <= progress.current_chapter <= progress.chapter_count + 1
+            1 <= progress.current_chapter <= progress.chapter_count + 1
         ):
             raise HTTPException(
                 422, "Confirm chapters and select reading progress first."
@@ -163,6 +163,7 @@ class RecapRequest(BaseModel):
     confirm: bool = Field(strict=True)
     require_citations: bool = Field(default=True, strict=True)
     include_current: bool = Field(default=False, strict=True)
+    save_turn: bool = Field(default=False, strict=True)
 
 
 @router.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
@@ -199,5 +200,6 @@ def recap_book(
             action.mode,
             require_citations=action.require_citations,
             include_current=action.include_current,
+            save_turn=action.save_turn,
         ),
     )

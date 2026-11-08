@@ -8,13 +8,14 @@ const props = defineProps<{
   model: string;
   completed: number;
   current: number | null;
+  disabled?: boolean;
 }>();
+const emit = defineEmits<{ saved: []; thinking: [question: string] }>();
 const busy = ref(false);
 const error = ref("");
 const schema = z.object({
   answer: z.string(),
 });
-const recap = ref<z.infer<typeof schema> | null>(null);
 let request: AbortController | null = null;
 
 function clear() {
@@ -22,14 +23,26 @@ function clear() {
   request = null;
   busy.value = false;
   error.value = "";
-  recap.value = null;
+  emit("thinking", "");
 }
 async function generate(mode: "chapter" | "through") {
-  if (!props.model || (mode === "chapter" ? !props.current : !props.completed)) return;
+  if (
+    props.disabled ||
+    busy.value ||
+    !props.model ||
+    (mode === "chapter" ? !props.current : !props.completed)
+  )
+    return;
   clear();
   const controller = new AbortController();
   request = controller;
   busy.value = true;
+  emit(
+    "thinking",
+    mode === "chapter"
+      ? `Summarize chapter ${props.current}.`
+      : `Summarize from the beginning before chapter ${props.completed + 1}.`,
+  );
   try {
     const response = await apiFetch(`/api/books/${encodeURIComponent(props.bookId)}/recap`, {
       method: "POST",
@@ -41,6 +54,7 @@ async function generate(mode: "chapter" | "through") {
         confirm: true,
         require_citations: false,
         include_current: mode === "chapter",
+        save_turn: true,
       }),
       signal: controller.signal,
     });
@@ -60,7 +74,7 @@ async function generate(mode: "chapter" | "through") {
     }
     const result = schema.safeParse(await response.json());
     if (!result.success) throw new Error("Could not verify the recap. Please try again.");
-    if (request === controller) recap.value = result.data;
+    if (request === controller) emit("saved");
   } catch (cause) {
     if (request === controller)
       error.value =
@@ -69,6 +83,7 @@ async function generate(mode: "chapter" | "through") {
     if (request === controller) {
       request = null;
       busy.value = false;
+      emit("thinking", "");
     }
   }
 }
@@ -81,21 +96,25 @@ onBeforeUnmount(clear);
 <template>
   <div class="recap">
     <div class="buttons">
-      <button type="button" :disabled="busy || !model || !current" @click="generate('chapter')">
+      <button
+        type="button"
+        :disabled="disabled || busy || !model || !current"
+        @click="generate('chapter')"
+      >
         Summarize this chapter
       </button>
-      <button type="button" :disabled="busy || !model || !completed" @click="generate('through')">
+      <button
+        type="button"
+        :disabled="disabled || busy || !model || !completed"
+        @click="generate('through')"
+      >
         Summarize before current chapter
       </button>
     </div>
     <p>
       Summarizing this chapter includes unread text and may reveal spoilers. Text is sent to OpenAI.
     </p>
-    <p v-if="busy" role="status">Creating summary…</p>
     <p v-if="error" role="alert">{{ error }}</p>
-    <section v-if="recap" aria-label="Summary">
-      <p class="answer">{{ recap.answer }}</p>
-    </section>
   </div>
 </template>
 
