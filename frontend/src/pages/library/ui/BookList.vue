@@ -6,10 +6,13 @@ import BookQuestion from "./BookQuestion.vue";
 import ConversationHistory from "./ConversationHistory.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
+import BookRecap from "./BookRecap.vue";
 
 const props = defineProps<{ book?: Book; loading: boolean; busy: boolean; model: string }>();
 const emit = defineEmits<{ delete: [book: Book]; chaptersAnalyzed: [] }>();
 const searchAvailable = ref(false);
+const completed = ref(0);
+const current = ref<number | null>(null);
 const historyVersion = ref(0);
 const thinking = ref(false);
 const transcript = ref<HTMLElement | null>(null);
@@ -110,8 +113,11 @@ onBeforeUnmount(() => {
           <ReadingProgress
             :book-id="book.id"
             @availability="searchAvailable = $event"
+            @completed="completed = $event"
+            @current="current = $event"
             @changed="historyVersion++"
           />
+          <BookRecap :book-id="book.id" :model="model" :completed="completed" :current="current" />
         </div>
         <div class="conversation">
           <div ref="transcript" class="transcript" tabindex="0" aria-label="Conversation messages">

@@ -77,6 +77,7 @@ def _run_book_generation(
     generate: Callable[[str], ValidatedAnswer],
 ) -> AnswerResponse:
     from src.book_assistant.citations import CitationValidationError
+    from src.book_assistant.recaps import SummaryGenerationError
     from src.chatgpt.accounts import active_account
     from src.chatgpt.exchange import ExchangeError
     from src.chatgpt.inference import InferenceError
@@ -98,6 +99,10 @@ def _run_book_generation(
     except CitationValidationError:
         raise HTTPException(
             502, "Could not verify the answer citations. Please retry."
+        ) from None
+    except SummaryGenerationError:
+        raise HTTPException(
+            502, "Could not create the summary. Please retry."
         ) from None
     except ProgressChanged:
         raise HTTPException(409, "Reading progress changed. Please retry.") from None
@@ -156,6 +161,8 @@ class RecapRequest(BaseModel):
     mode: Literal["chapter", "through"] = "chapter"
     model: str = Field(min_length=1, max_length=256, strict=True)
     confirm: bool = Field(strict=True)
+    require_citations: bool = Field(default=True, strict=True)
+    include_current: bool = Field(default=False, strict=True)
 
 
 @router.post("/api/books/{book_id}/answer", response_model=AnswerResponse)
@@ -185,6 +192,12 @@ def recap_book(
         response,
         action.confirm,
         lambda account: recap_chapter(
-            book_id, account, action.model, action.chapter, action.mode
+            book_id,
+            account,
+            action.model,
+            action.chapter,
+            action.mode,
+            require_citations=action.require_citations,
+            include_current=action.include_current,
         ),
     )

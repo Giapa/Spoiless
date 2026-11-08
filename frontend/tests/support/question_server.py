@@ -166,6 +166,14 @@ def fake_openai(self, request):
                     '"response":{"status":"completed"}}\n\n'
                 ),
             )
+        if prompt.startswith("Summarize the supplied text") and body["model"] == "a1":
+            answer = json.dumps({"answer": "A summary."})
+            delta = json.dumps({"type": "response.output_text.delta", "delta": answer})
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                text=f'data: {delta}\n\ndata: {{"type":"response.completed","response":{{"status":"completed"}}}}\n\n',
+            )
         if long_recap and body["model"] == "a1":
             payload = json.loads(prompt.split("\n", 1)[1])
             if "UNREAD_SECRET" in prompt:

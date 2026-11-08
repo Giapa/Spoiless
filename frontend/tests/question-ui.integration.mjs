@@ -117,6 +117,24 @@ test("AI chapter analysis can be retried and makes chapters available", async ()
 });
 
 
+test("summary buttons choose the current chapter or the text before it", async () => {
+  const { browser, page } = await openApp({ openAccount: false });
+  try {
+    await page.getByRole("button", { name: "Load available models" }).click();
+    await page.getByRole("combobox", { name: "ChatGPT model" }).selectOption("a1");
+    for (const [name, mode, chapter, current] of [["Summarize this chapter", "chapter", 2, true], ["Summarize before current chapter", "through", 1, false]]) {
+      const request = page.waitForRequest((req) => req.url().endsWith("/recap") && req.method() === "POST");
+      await page.getByRole("button", { name }).click();
+      const body = (await request).postDataJSON();
+      assert.equal(body.chapter, chapter);
+      assert.equal(body.mode, mode);
+      assert.equal(body.include_current, current);
+      assert.equal(body.require_citations, false);
+      await page.getByRole("region", { name: "Summary" }).getByText("A summary.").waitFor();
+    }
+  } finally { await browser.close(); }
+});
+
 test("reader asks a question and sees a verified citation", async () => {
   const { browser, page } = await openApp();
   try {

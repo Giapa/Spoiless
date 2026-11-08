@@ -5,7 +5,12 @@ import { z } from "zod";
 import { chapterTitles } from "../model/chapterTitles";
 
 const props = defineProps<{ bookId: string }>();
-const emit = defineEmits<{ availability: [ready: boolean]; changed: [] }>();
+const emit = defineEmits<{
+  availability: [ready: boolean];
+  changed: [];
+  completed: [count: number];
+  current: [chapter: number | null];
+}>();
 const schema = z.object({
   chapter_count: z.number().int().nonnegative(),
   current_chapter: z.number().int().nullable(),
@@ -61,9 +66,19 @@ async function load() {
     titlesUnavailable.value = titles === null;
     choice.value = progress.value.current_chapter?.toString() ?? "";
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
+    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
+    emit(
+      "current",
+      progress.value.current_chapter &&
+        progress.value.current_chapter <= progress.value.chapter_count
+        ? progress.value.current_chapter
+        : null,
+    );
   } catch {
     if (version !== loadVersion) return;
     emit("availability", false);
+    emit("completed", 0);
+    emit("current", null);
     error.value = "Could not load reading progress.";
   } finally {
     if (version === loadVersion) loading.value = false;
@@ -75,6 +90,8 @@ async function save() {
   loading.value = false;
   busy.value = true;
   emit("availability", false);
+  emit("completed", 0);
+  emit("current", null);
   error.value = "";
   notice.value = "";
   try {
@@ -87,6 +104,14 @@ async function save() {
     progress.value = schema.parse(await response.json());
     notice.value = "Reading progress saved.";
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
+    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
+    emit(
+      "current",
+      progress.value.current_chapter &&
+        progress.value.current_chapter <= progress.value.chapter_count
+        ? progress.value.current_chapter
+        : null,
+    );
   } catch {
     await load();
     error.value = "Could not save reading progress. Check the selection and try again.";
