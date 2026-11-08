@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import { z } from "zod";
 
@@ -58,7 +59,7 @@ let disposed = false;
 let generation = 0;
 
 async function request(path: string, action = false, accountId?: string): Promise<State> {
-  const response = await fetch(
+  const response = await apiFetch(
     path,
     action
       ? {
@@ -82,7 +83,7 @@ async function load() {
     const latest = await request("/api/chatgpt/sign-in");
     if (current !== generation || disposed) return;
     if (["idle", "saved", "connected"].includes(latest.status)) {
-      const response = await fetch("/api/chatgpt/accounts");
+      const response = await apiFetch("/api/chatgpt/accounts");
       if (!response.ok) throw new Error();
       const saved = accountSchema.parse(await response.json());
       if (current !== generation || disposed) return;
@@ -124,7 +125,7 @@ async function signOut() {
   busy.value = true;
   clearTimeout(timer);
   try {
-    const response = await fetch("/api/chatgpt/sign-out", {
+    const response = await apiFetch("/api/chatgpt/sign-out", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
       body: JSON.stringify({ confirm: true }),

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { z } from "zod";
 import { chapterTitles } from "../model/chapterTitles";
@@ -27,8 +28,8 @@ async function loadChapterTitles() {
     character_offset: z.number().int().nonnegative().nullable(),
   });
   const [unitsResponse, navigationResponse] = await Promise.all([
-    fetch(`${bookEndpoint}/reading-units`),
-    fetch(`${bookEndpoint}/navigation?include_titles=true`),
+    apiFetch(`${bookEndpoint}/reading-units`),
+    apiFetch(`${bookEndpoint}/navigation?include_titles=true`),
   ]);
   if (!unitsResponse.ok || !navigationResponse.ok) throw new Error();
   const units = z
@@ -47,7 +48,7 @@ async function load() {
   notice.value = "";
   try {
     const [response, titles] = await Promise.all([
-      fetch(endpoint),
+      apiFetch(endpoint),
       loadChapterTitles().catch(() => null),
     ]);
     if (!response.ok) throw new Error();
@@ -77,7 +78,7 @@ async function save() {
   error.value = "";
   notice.value = "";
   try {
-    const response = await fetch(endpoint, {
+    const response = await apiFetch(endpoint, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ current_chapter: Number(choice.value) }),

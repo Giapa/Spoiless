@@ -1,12 +1,75 @@
 <script setup lang="ts">
+import { requestErrors } from "./pages/library/api/apiFetch";
 import LibraryPage from "./pages/library/ui/LibraryPage.vue";
 </script>
 
 <template>
   <LibraryPage />
+  <div class="notifications" aria-label="Backend errors">
+    <div v-for="message in requestErrors" :key="message" class="notification">
+      <div role="alert">
+        <strong>Request failed</strong>
+        <p>{{ message }}</p>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss error"
+        @click="requestErrors = requestErrors.filter((item) => item !== message)"
+      >
+        ×
+      </button>
+    </div>
+  </div>
 </template>
 
 <style>
+.notifications {
+  position: fixed;
+  z-index: 100;
+  right: 20px;
+  bottom: 20px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: 60dvh;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+}
+.notification {
+  display: flex;
+  gap: 16px;
+  align-items: start;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid #dfb5ae;
+  border-radius: 10px;
+  background: #fffaf9;
+  color: #652c26;
+  box-shadow: 0 8px 24px #1b1b1b1a;
+  overflow-wrap: anywhere;
+}
+.notification p {
+  margin: 4px 0 0;
+}
+.notification button {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 24px;
+  line-height: 1;
+}
+.notification button:hover {
+  background: #f5e4e1;
+}
+@media (max-width: 700px) {
+  .notifications {
+    right: 16px;
+    bottom: 16px;
+  }
+}
 * {
   box-sizing: border-box;
 }

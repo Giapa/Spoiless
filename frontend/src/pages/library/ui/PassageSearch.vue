@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { z } from "zod";
 
@@ -29,7 +30,7 @@ async function search() {
   request = controller;
   busy.value = true;
   try {
-    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/hybrid-search`, {
+    const response = await apiFetch(`/api/books/${encodeURIComponent(props.bookId)}/hybrid-search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: query.value }),

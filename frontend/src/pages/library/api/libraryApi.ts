@@ -1,3 +1,4 @@
+import { apiFetch } from "./apiFetch";
 import { z } from "zod";
 
 const bookSchema = z.object({
@@ -18,13 +19,13 @@ async function ensureSuccess(response: Response): Promise<Response> {
 }
 
 export async function fetchBooks(): Promise<Book[]> {
-  const response = await ensureSuccess(await fetch("/api/books"));
+  const response = await ensureSuccess(await apiFetch("/api/books"));
   return z.array(bookSchema).parse(await response.json());
 }
 
 export async function importBook(file: File): Promise<Book> {
   const response = await ensureSuccess(
-    await fetch("/api/books", {
+    await apiFetch("/api/books", {
       method: "POST",
       headers: { "Content-Type": "application/epub+zip" },
       body: file,
@@ -35,6 +36,6 @@ export async function importBook(file: File): Promise<Book> {
 
 export async function deleteBook(bookId: string): Promise<void> {
   await ensureSuccess(
-    await fetch(`/api/books/${encodeURIComponent(bookId)}`, { method: "DELETE" }),
+    await apiFetch(`/api/books/${encodeURIComponent(bookId)}`, { method: "DELETE" }),
   );
 }

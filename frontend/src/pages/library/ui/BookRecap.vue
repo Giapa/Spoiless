@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { z } from "zod";
 
@@ -34,7 +35,7 @@ async function generate() {
   request = controller;
   busy.value = true;
   try {
-    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/recap`, {
+    const response = await apiFetch(`/api/books/${encodeURIComponent(props.bookId)}/recap`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
       body: JSON.stringify({

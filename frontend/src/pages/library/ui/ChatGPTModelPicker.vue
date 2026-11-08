@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { z } from "zod";
 
@@ -22,7 +23,7 @@ function clearModels() {
 watch(() => props.accountVersion, clearModels);
 const accountSchema = z.array(z.object({ id: z.string(), active: z.boolean() }));
 async function activeAccountId(): Promise<string | null> {
-  const response = await fetch("/api/chatgpt/accounts");
+  const response = await apiFetch("/api/chatgpt/accounts");
   if (!response.ok) throw new Error();
   return accountSchema.parse(await response.json()).find((account) => account.active)?.id ?? null;
 }
@@ -52,7 +53,7 @@ async function loadModels() {
   try {
     const accountId = await activeAccountId();
     if (!accountId) throw new Error("Connect a ChatGPT account first.");
-    const response = await fetch("/api/chatgpt/models", {
+    const response = await apiFetch("/api/chatgpt/models", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
       body: JSON.stringify({ confirm: true }),

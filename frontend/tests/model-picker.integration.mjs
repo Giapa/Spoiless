@@ -151,3 +151,21 @@ test("signing out clears the previous account's model selection", async () => {
     await page.getByText("Connect a ChatGPT account first.").waitFor();
   } finally { await browser.close(); }
 });
+
+test("backend errors appear in a dismissible notification", async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  try {
+    await page.route("**/api/books", (route) =>
+      route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: "Connect an account and try again." }) }),
+    );
+    for (let tries = 0; ; tries++) {
+      try { await page.goto(`http://127.0.0.1:${port}`); break; }
+      catch (error) { if (tries >= 50) throw error; await new Promise((r) => setTimeout(r, 100)); }
+    }
+    const notification = page.locator(".notification");
+    await notification.getByText("Connect an account and try again.").waitFor();
+    await notification.getByRole("button", { name: "Dismiss error" }).click();
+    assert.equal(await notification.count(), 0);
+  } finally { await browser.close(); }
+});

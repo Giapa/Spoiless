@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onBeforeUnmount, ref, watch } from "vue";
 import { z } from "zod";
 
@@ -34,7 +35,7 @@ async function ask() {
   busy.value = true;
   emit("thinking", true);
   try {
-    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/answer`, {
+    const response = await apiFetch(`/api/books/${encodeURIComponent(props.bookId)}/answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Spoiless-Action": "1" },
       body: JSON.stringify({ question: question.value, model: props.model, confirm: true }),

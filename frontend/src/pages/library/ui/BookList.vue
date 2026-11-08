@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { nextTick, onBeforeUnmount, ref } from "vue";
 import { z } from "zod";
 import BookQuestion from "./BookQuestion.vue";
@@ -32,7 +33,7 @@ async function analyzeChapters() {
   analyzing.value = true;
   analysisError.value = "";
   try {
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/books/${encodeURIComponent(props.book.id)}/analyze-chapters`,
       {
         method: "POST",

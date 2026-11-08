@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { z } from "zod";
 
@@ -35,7 +36,7 @@ async function load() {
   request = controller;
   loading.value = true;
   try {
-    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/conversation`, {
+    const response = await apiFetch(`/api/books/${encodeURIComponent(props.bookId)}/conversation`, {
       signal: controller.signal,
       cache: "no-store",
     });

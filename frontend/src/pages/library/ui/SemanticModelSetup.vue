@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { apiFetch } from "../api/apiFetch";
 import { onMounted, ref } from "vue";
 import { z } from "zod";
 
@@ -9,7 +10,7 @@ const statusSchema = z.object({ ready: z.boolean() });
 async function load() {
   error.value = "";
   try {
-    const response = await fetch("/api/semantic-model");
+    const response = await apiFetch("/api/semantic-model");
     if (!response.ok) throw new Error();
     ready.value = statusSchema.parse(await response.json()).ready;
   } catch {
@@ -20,7 +21,7 @@ async function download() {
   busy.value = true;
   error.value = "";
   try {
-    const response = await fetch("/api/semantic-model", {
+    const response = await apiFetch("/api/semantic-model", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ consent: true }),
