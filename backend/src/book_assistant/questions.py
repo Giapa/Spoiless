@@ -57,7 +57,7 @@ def answer_book_question(
             remaining -= size
         history.reverse()
         progress = _progress(observer, book_id)
-        passages = hybrid_search(book_id, question, connection=observer)
+        passages = hybrid_search(book_id, question, limit=20, connection=observer)
 
         def verify_boundary() -> None:
             _check_snapshot(book_id, snapshot)

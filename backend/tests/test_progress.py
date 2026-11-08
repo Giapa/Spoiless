@@ -5,7 +5,44 @@ from pydantic import ValidationError
 from src.database import connect
 from src.library import storage as library
 from src.library.api import ProgressRequest, reading_progress, update_progress
-from src.library.epub import Book, Section
+from src.library.epub import Book, NavigationEntry, Section
+
+
+def test_excerpt_and_preceding_back_matter_stay_out_of_completed_text(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    book = library.add_book(
+        Book(
+            "Book",
+            tuple(
+                Section(text)
+                for text in (
+                    "The story ends.",
+                    "Dedication",
+                    "Promotional spoilers",
+                    "Excerpt",
+                    "UNREAD SEQUEL CHAPTER",
+                )
+            ),
+            (
+                NavigationEntry("Chapter 1", 0, 0),
+                NavigationEntry("Dedication", 1, 0),
+                NavigationEntry("Excerpt from another book", 3, 0),
+                NavigationEntry("Chapter 1", 4, 0),
+            ),
+        )
+    )
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 4, 0),
+        ],
+    )
+    for progress in (2, 3):
+        library.set_progress(book, progress)
+        assert library.eligible_text(book) == [(0, "The story ends.")]
 
 
 def test_progress_boundary_and_reconfirmation(tmp_path, monkeypatch):

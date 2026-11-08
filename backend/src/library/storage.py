@@ -1,5 +1,6 @@
 """Local storage for imported books and their unconfirmed sections."""
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from typing import Literal
@@ -284,7 +285,7 @@ def set_progress(book_id: str, current_chapter: int) -> ReadingProgress:
 
 
 def eligible_text(book_id: str) -> list[tuple[int, str]]:
-    """Only confirmed text before the current chapter; finished includes all text.
+    """Only confirmed text before the current chapter or a marked book excerpt.
 
     Must be used before retrieval or model context is assembled. Reads the boundary
     and text in one transaction so a chapter-map update cannot mix revisions.
@@ -305,6 +306,48 @@ def eligible_text(book_id: str) -> list[tuple[int, str]]:
                ORDER BY position LIMIT 1 OFFSET ?""",
             (book_id, progress.current_chapter - 1),
         ).fetchone()
+        navigation = db.execute(
+            "SELECT title, section_position, character_offset FROM navigation_entries "
+            "WHERE book_id = ? AND section_position IS NOT NULL "
+            "AND character_offset IS NOT NULL "
+            "ORDER BY section_position, character_offset",
+            (book_id,),
+        ).fetchall()
+        excerpt = next(
+            (
+                (section, offset)
+                for title, section, offset in navigation
+                if re.match(r"^\s*excerpt\b", title, re.I)
+            ),
+            None,
+        )
+        if excerpt:
+            chapters = db.execute(
+                "SELECT section_position, character_offset FROM reading_units "
+                "WHERE book_id = ? AND kind = 'chapter' ORDER BY position",
+                (book_id,),
+            ).fetchall()
+            previous = max(
+                (point for point in chapters if point < excerpt), default=None
+            )
+            if previous is not None:
+                # Keep clearly marked end matter, including promotion before the
+                # excerpt, out of the context even in an existing chapter map.
+                cutoff = next(
+                    (
+                        (section, offset)
+                        for title, section, offset in navigation
+                        if previous < (section, offset) < excerpt
+                        and re.match(
+                            r"^\s*(dedication|acknowledg(?:e)?ments|"
+                            r"about the author)\b",
+                            title,
+                            re.I,
+                        )
+                    ),
+                    excerpt,
+                )
+                boundary = min(boundary, cutoff) if boundary is not None else cutoff
         if boundary is None:
             return db.execute(
                 "SELECT position, text FROM sections "

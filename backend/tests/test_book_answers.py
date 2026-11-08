@@ -128,6 +128,42 @@ def test_semantic_search_can_find_evidence_without_matching_words(
     assert "UNREAD_SECRET" not in prompts[0]
 
 
+def test_answer_can_use_relevant_evidence_beyond_first_five_results(
+    reading_setup, monkeypatch
+):
+    _, account = reading_setup
+    sections = [Section(f"Darrow speaks to stranger {i}.") for i in range(10)]
+    sections += [Section("My wife Eo held my hand."), Section("UNREAD_SECRET")]
+    book = library.add_book(Book("First person story", tuple(sections)))
+    library.confirm_reading_units(
+        book,
+        [
+            library.ReadingUnitStart("chapter", 0, 0),
+            library.ReadingUnitStart("chapter", 11, 0),
+        ],
+    )
+    library.set_progress(book, 2)
+
+    def generate(account_id, model, prompt, before_send):
+        before_send()
+        payload = json.loads(prompt.split("\n", 1)[1])
+        assert all("UNREAD_SECRET" not in p for p in payload["passages"])
+        index = next(
+            i for i, text in enumerate(payload["passages"]) if "wife Eo" in text
+        )
+        return json.dumps(
+            {
+                "answer": "Eo is his wife.",
+                "citations": [{"passage": index, "quote": "My wife Eo"}],
+            }
+        )
+
+    monkeypatch.setattr("src.book_assistant.questions.generate_response", generate)
+    result = answer_book_question(book, account, "model", "Who is Darrow related to?")
+    assert result.answer == "Eo is his wife."
+    assert result.citations[0].section_position == 10
+
+
 def test_model_can_decline_when_passage_lacks_an_answer(reading_setup, monkeypatch):
     book, account = reading_setup
 
@@ -371,7 +407,11 @@ def test_chat_routes_recap_and_saves_it(reading_setup, monkeypatch):
         ).fetchone() == ("Summarize chapter 1", "A recap.")
     library.set_progress(book, 3)
     with connect() as db:
-        assert db.execute(
-            "SELECT count(*) FROM conversation_turns WHERE book_id = ? AND active = 1",
-            (book,),
-        ).fetchone()[0] == 0
+        assert (
+            db.execute(
+                "SELECT count(*) FROM conversation_turns "
+                "WHERE book_id = ? AND active = 1",
+                (book,),
+            ).fetchone()[0]
+            == 0
+        )
