@@ -11,12 +11,16 @@ const selectedModel = ref("");
 const accountVersion = ref(0);
 const selectedBookId = ref("");
 const sidebarOpen = ref(!window.matchMedia("(max-width: 700px)").matches);
-const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } = useLibrary();
-const selectedBook = computed(() => books.value.find((book) => book.id === selectedBookId.value));
+const { books, loading, busy, error, notice, loadBooks, addBook, removeBook } =
+  useLibrary();
+const selectedBook = computed(() =>
+  books.value.find((book) => book.id === selectedBookId.value),
+);
 watch(
   () => books.value.map((book) => book.id),
   (ids) => {
-    if (!ids.includes(selectedBookId.value)) selectedBookId.value = ids[0] ?? "";
+    if (!ids.includes(selectedBookId.value))
+      selectedBookId.value = ids[0] ?? "";
   },
   { immediate: true },
 );
@@ -41,7 +45,13 @@ watch(
           aria-controls="library-sidebar"
           @click="sidebarOpen = !sidebarOpen"
         >
-          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <svg
+            aria-hidden="true"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
             <rect
               x="2.5"
               y="3.5"
@@ -57,20 +67,33 @@ watch(
       </div>
       <div v-show="sidebarOpen" id="library-sidebar" class="sidebar-content">
         <label for="book-select">Book</label>
-        <select id="book-select" v-model="selectedBookId" :disabled="!books.length">
+        <select
+          id="book-select"
+          v-model="selectedBookId"
+          :disabled="!books.length"
+        >
           <option v-if="!books.length" value="">No books yet</option>
-          <option v-for="book in books" :key="book.id" :value="book.id">{{ book.title }}</option>
+          <option v-for="book in books" :key="book.id" :value="book.id">
+            {{ book.title }}
+          </option>
         </select>
-        <AddBookButton :disabled="busy || loading" :busy="busy" @select="addBook" />
+        <AddBookButton
+          :disabled="busy || loading"
+          :busy="busy"
+          @select="addBook"
+        />
         <p class="hint">EPUB files are stored on this device. Maximum 25 MB.</p>
         <p v-if="error" class="message error" role="alert">
           {{ error }} <button type="button" @click="loadBooks">Retry</button>
         </p>
         <p v-if="notice" class="message" role="status">{{ notice }}</p>
-        <details class="settings">
+        <details class="settings" open>
           <summary>Account and model</summary>
           <ChatGPTConnection @account-changing="accountVersion++" />
-          <ChatGPTModelPicker v-model="selectedModel" :account-version="accountVersion" />
+          <ChatGPTModelPicker
+            v-model="selectedModel"
+            :account-version="accountVersion"
+          />
         </details>
         <SemanticModelSetup />
       </div>
