@@ -6,6 +6,7 @@ lock to coordinate with other local processes.
 
 import os
 import stat
+import sys
 import time
 from dataclasses import dataclass
 from threading import Lock, Thread
@@ -67,21 +68,31 @@ class SignInState:
 
 def _acquire_attempt_lock() -> int:
     """Prevent overlapping browser sign-ins across local server processes."""
-    if fcntl is None:
-        raise SignInStartError("Local sign-in is only supported on Linux so far.")
     path = database_path().parent / "chatgpt-sign-in.lock"
     try:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        if path.is_symlink():
+            raise OSError("Invalid sign-in lock file")
+        flags = os.O_RDWR | os.O_CREAT
+        flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(path, flags, 0o600)
         try:
             info = os.fstat(fd)
             if (
                 not stat.S_ISREG(info.st_mode)
-                or info.st_uid != os.getuid()
-                or info.st_mode & 0o077
+                or (sys.platform != "win32" and info.st_uid != os.getuid())
+                or (sys.platform != "win32" and info.st_mode & 0o077)
             ):
                 raise OSError("Invalid sign-in lock file")
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if sys.platform == "win32":
+                import msvcrt
+
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                except OSError:
+                    raise BlockingIOError from None
+            else:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return fd
         except BaseException:
             os.close(fd)

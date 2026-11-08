@@ -1,4 +1,4 @@
-"""Local ChatGPT credential records backed only by Linux Secret Service.
+"""Local ChatGPT credential records backed only by native OS credential stores.
 
 These functions are backend-only. They must be called after identity verification;
 no credentials are sent to the browser or written to the library database.
@@ -89,24 +89,32 @@ class CredentialRecord(BaseModel):
         return self
 
 
-def _backend() -> SecretService.Keyring:
-    """Select the Linux OS service explicitly; do not fall back to file backends."""
-    if sys.platform != "linux":
-        raise CredentialStoreError(
-            "Secure credential storage is only supported on Linux so far."
-        )
+def _backend():
+    """Select a native secure store explicitly; never fall back to plaintext."""
     try:
-        if SecretService.Keyring.priority <= 0:
-            raise RuntimeError("Secret Service unavailable")
-        return SecretService.Keyring()
+        if sys.platform == "linux":
+            backend = SecretService.Keyring
+        elif sys.platform == "darwin":
+            from keyring.backends.macOS import Keyring
+
+            backend = Keyring
+        elif sys.platform == "win32":
+            from keyring.backends.Windows import WinVaultKeyring
+
+            backend = WinVaultKeyring
+        else:
+            raise RuntimeError("Unsupported operating system")
+        if backend.priority <= 0:
+            raise RuntimeError("Secure store unavailable")
+        return backend()
     except Exception:
         raise CredentialStoreError(
-            "Linux Secret Service is unavailable. Unlock or enable your system keyring."
+            "The system credential store is unavailable. Unlock or enable your keyring."
         ) from None
 
 
 def check_credential_store() -> None:
-    """Check for the Linux service without reading or writing credentials."""
+    """Check for the native service without reading or writing credentials."""
     _backend()
 
 

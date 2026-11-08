@@ -256,3 +256,24 @@ def test_returning_listener_passes_selected_identity_without_logging_hint(
     finally:
         session.close()
         assert session.wait(3)
+
+
+@pytest.mark.skipif(listener.sys.platform != "linux", reason="Linux packaging behavior")
+def test_frozen_linux_browser_uses_system_library_path(session, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(listener.sys, "frozen", True, raising=False)
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/bundled/python/libs")
+    monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/system/libs")
+    calls = []
+
+    def launch(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(listener.subprocess, "run", launch)
+    session.open_browser()
+    command, options = calls[0]
+    assert command == ["xdg-open", session._url]
+    assert options["env"]["LD_LIBRARY_PATH"] == "/system/libs"
+    assert "LD_LIBRARY_PATH_ORIG" not in options["env"]

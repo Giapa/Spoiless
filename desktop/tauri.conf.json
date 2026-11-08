@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Spoiless",
+  "version": "0.1.0",
+  "identifier": "com.spoiless.desktop",
+  "build": { "frontendDist": "ui" },
+  "app": {
+    "windows": [],
+    "security": { "capabilities": [] }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"],
+    "resources": { "../backend/dist/spoiless-backend/": "backend/" },
+    "shortDescription": "A local-first reading companion",
+    "category": "Education"
+  }
+}

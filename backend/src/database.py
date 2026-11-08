@@ -2,12 +2,19 @@
 
 import os
 import sqlite3
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 
 
 def database_path() -> Path:
-    data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    if sys.platform == "win32":
+        default = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+    elif sys.platform == "darwin":
+        default = Path.home() / "Library/Application Support"
+    else:
+        default = Path.home() / ".local/share"
+    data_home = Path(os.environ.get("XDG_DATA_HOME", default))
     return data_home / "spoiless" / "library.sqlite3"
 
 

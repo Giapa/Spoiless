@@ -4,7 +4,10 @@ No web route or UI uses this yet. The caller must keep the session in the backen
 and must not expose its authorization URL, verifier, callback, or tokens in logs.
 """
 
+import os
 import secrets
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -101,7 +104,25 @@ class LocalSignIn:
                 raise RuntimeError("This sign-in attempt is no longer available.")
             self._opened = True
         try:
-            opened = webbrowser.open(self._url)
+            if getattr(sys, "frozen", False) and sys.platform == "linux":
+                # PyInstaller's library path must not leak into the system browser.
+                env = os.environ.copy()
+                original = env.pop("LD_LIBRARY_PATH_ORIG", None)
+                env.pop("LD_LIBRARY_PATH", None)
+                if original:
+                    env["LD_LIBRARY_PATH"] = original
+                opened = (
+                    subprocess.run(
+                        ["xdg-open", self._url],
+                        env=env,
+                        timeout=15,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    ).returncode
+                    == 0
+                )
+            else:
+                opened = webbrowser.open(self._url)
         except Exception:
             opened = False
         if not opened:

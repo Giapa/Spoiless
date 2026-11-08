@@ -14,6 +14,14 @@ Spoiless is an **experimental project in development**. It is designed to limit 
 
 Your current chapter is treated as **unread**. Select **Finished book** when you have completed it. Changing your selection saves progress automatically and starts a new conversation; older conversations are hidden, not deleted, until you delete the book.
 
+## Desktop app
+
+The Tauri desktop wrapper bundles the existing Vue interface and Python backend.
+See [desktop build instructions](docs/desktop.md) for building a Linux installer
+for manual distribution, and the requirements for later Windows/macOS builds.
+Windows/macOS builds and real-account AI behavior still need platform testing
+before sharing those releases.
+
 ## Getting started
 
 ### Requirements
