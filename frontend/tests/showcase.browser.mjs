@@ -20,7 +20,7 @@ test('showcase explains the reading boundary and responds to keyboard input', as
       assert.match(await page.locator('#boundary-result').innerText(), /Chapters 1 and 2/);
       await page.keyboard.press('ArrowRight');
       assert.equal(await slider.getAttribute('aria-valuetext'), 'Finished book');
-      assert.match(await page.locator('#boundary-result').innerText(), /All confirmed chapters/);
+      assert.match(await page.locator('#boundary-result').innerText(), /All detected chapters/);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       assert.equal(await page.locator('img').evaluateAll((images) => images.every((image) => image.complete && image.naturalWidth > 0)), true);
       assert.equal(await page.getByRole('link', { name: /See how to run it/ }).getAttribute('href'), 'https://github.com/Giapa/Spoiless#readme');
