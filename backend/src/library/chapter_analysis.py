@@ -5,7 +5,7 @@ import re
 
 from src.chatgpt.inference import generate_response
 from src.library import storage
-from src.library.epub import _NON_CHAPTER
+from src.library.epub import _NON_CHAPTER, _toc_chapter_number
 
 _NUMBERED_CHAPTER = re.compile(r"^chapter\s+(\d+)\s*$", re.I)
 _CHAPTER_LINE = re.compile(r"(?im)^chapter\s+\d+\b[^\n]*")
@@ -58,8 +58,21 @@ def analyze_chapters(book_id: str, account_id: str, model: str) -> None:
             for label in labels
             if (match := _NUMBERED_CHAPTER.match(label.strip()))
         }
+        if (position, offset) in navigation_points:
+            numbers.update(
+                number
+                for label in labels[:-1]
+                if (number := _toc_chapter_number(label, line)) is not None
+            )
         if len(numbers) > 1:
             raise ValueError("Could not verify chapter boundaries. Please retry.")
+        if (
+            numbers
+            and _NON_CHAPTER.match(line)
+            and not re.match(r"^\s*part\b", line, re.I)
+        ):
+            ambiguous.append(((position, offset), numbers, labels[:-1][:5]))
+            continue
         if numbers and (offset == 0 or (position, offset) in navigation_points):
             starts.append((position, offset))
             numbered.append(((position, offset), next(iter(numbers))))
@@ -118,7 +131,15 @@ def analyze_chapters(book_id: str, account_id: str, model: str) -> None:
 
     starts.sort()
     chapter_indexes = {point: index for index, point in enumerate(starts, start=1)}
-    if any(chapter_indexes[point] != number for point, number in numbered):
+    # A first chapter numbered zero is a common convention; later gaps still fail.
+    starts_at_zero = (
+        any(point == starts[0] and number == 0 for point, number in numbered)
+        if starts
+        else False
+    )
+    if any(
+        chapter_indexes[point] - starts_at_zero != number for point, number in numbered
+    ):
         raise ValueError("Could not verify chapter boundaries. Please retry.")
 
     if not starts:

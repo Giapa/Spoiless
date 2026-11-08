@@ -56,10 +56,8 @@ watch(
 );
 onMounted(() => {
   void load();
-  window.addEventListener("blur", clear);
 });
 onBeforeUnmount(() => {
-  window.removeEventListener("blur", clear);
   clear();
 });
 </script>
@@ -69,7 +67,7 @@ onBeforeUnmount(() => {
     <h3>Conversation</h3>
     <p>
       Questions and answers are stored on this device. Recent turns may be sent to OpenAI with new
-      questions. Moving backward starts a new conversation.
+      questions. Changing chapters starts a new conversation.
     </p>
     <p v-if="loading" role="status">Loading conversation…</p>
     <p v-else-if="error" role="alert">

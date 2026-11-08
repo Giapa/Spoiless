@@ -4,7 +4,6 @@ import { z } from "zod";
 
 const props = defineProps<{ bookId: string }>();
 const query = ref("");
-const mode = ref("keyword");
 const busy = ref(false);
 const error = ref("");
 const searched = ref(false);
@@ -30,8 +29,7 @@ async function search() {
   request = controller;
   busy.value = true;
   try {
-    const endpoint = mode.value === "hybrid" ? "hybrid-search" : "keyword-search";
-    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/${endpoint}`, {
+    const response = await fetch(`/api/books/${encodeURIComponent(props.bookId)}/hybrid-search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: query.value }),
@@ -75,17 +73,12 @@ onBeforeUnmount(() => {
         placeholder="Character, place, or detail"
         @input="clear"
       />
-      <label :for="`mode-${bookId}`">Search method</label>
       <div class="controls">
-        <select :id="`mode-${bookId}`" v-model="mode" @change="clear">
-          <option value="keyword">Words</option>
-          <option value="hybrid">Words and meaning</option>
-        </select>
         <button type="submit" :disabled="busy || !query.trim()">
           {{ busy ? "Searching…" : "Search" }}
         </button>
       </div>
-      <p>Search uses your saved progress. Meaning search needs the local model.</p>
+      <p>Search uses words and meaning from completed chapters. It needs the local search model.</p>
     </form>
     <p v-if="busy" role="status">Searching completed chapters…</p>
     <p v-if="error" role="alert">{{ error }}</p>

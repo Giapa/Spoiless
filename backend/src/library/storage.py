@@ -267,7 +267,7 @@ def set_progress(book_id: str, current_chapter: int) -> ReadingProgress:
             raise ValueError("Choose a valid current chapter.")
         if (
             progress.current_chapter is not None
-            and current_chapter < progress.current_chapter
+            and current_chapter != progress.current_chapter
         ):
             db.execute(
                 "UPDATE conversation_turns SET active = 0 "

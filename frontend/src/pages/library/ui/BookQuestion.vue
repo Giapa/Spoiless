@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import { z } from "zod";
 
 const props = defineProps<{ bookId: string; model: string; disabled?: boolean }>();
@@ -69,9 +69,7 @@ async function ask() {
   }
 }
 watch(() => props.model, clear);
-onMounted(() => window.addEventListener("blur", clear));
 onBeforeUnmount(() => {
-  window.removeEventListener("blur", clear);
   clear();
 });
 </script>
@@ -104,7 +102,13 @@ onBeforeUnmount(() => {
         {{ busy ? "Asking…" : "Ask" }}
       </button>
     </form>
-    <p v-if="busy" role="status">Checking the completed chapters…</p>
+    <div v-if="busy" class="thinking" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span
+        ><strong>Thinking…</strong><br />Reading your completed chapters and preparing an
+        answer.</span
+      >
+    </div>
     <p v-if="error" role="alert">{{ error }}</p>
   </section>
 </template>
@@ -149,6 +153,37 @@ p {
   font-size: 14px;
   margin: 6px 0;
   color: #555;
+}
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #eef4ee;
+  color: #315b45;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.spinner {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 2px solid #b8cbbb;
+  border-top-color: #315b45;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
 }
 .answer,
 blockquote {

@@ -5,6 +5,7 @@ import json
 import math
 import re
 import sqlite3
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -95,7 +96,13 @@ def keyword_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
     return [passages[i] for i in ranking[:limit]]
 
 
-def hybrid_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
+def hybrid_search(
+    book_id: str,
+    query: str,
+    limit: int = 5,
+    *,
+    connection: sqlite3.Connection | None = None,
+) -> list[Passage]:
     """Combine keyword and semantic rankings for eligible passages."""
     from src.retrieval.embedding_model import load_model
 
@@ -110,7 +117,7 @@ def hybrid_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
     # Only look up entries for passages already clipped to the current boundary.
     hashes = [hashlib.sha256(p.text.encode("utf-8")).hexdigest() for p in passages]
     cached: dict[int, list[float]] = {}
-    with connect() as db:
+    with nullcontext(connection) if connection is not None else connect() as db:
         for index, passage in enumerate(passages):
             row = db.execute(
                 """SELECT vector FROM passage_embeddings
@@ -175,12 +182,13 @@ def hybrid_search(book_id: str, query: str, limit: int = 5) -> list[Passage]:
             raise ValueError("Invalid embedding similarities.")
     except Exception as exc:
         raise ModelUnavailable(
-            "Local model unavailable; check its setup and retry."
+            "Local search model unavailable. "
+            "Download it in Local search settings and retry."
         ) from exc
     if revision != model_revision():
         raise ProgressChanged("The search model changed; retry the search.")
     _check_snapshot(book_id, snapshot)
-    with connect() as db, db:
+    with nullcontext(connection) if connection is not None else connect() as db, db:
         db.executemany(
             """INSERT OR REPLACE INTO passage_embeddings
                (book_id, section_position, character_offset, content_hash,

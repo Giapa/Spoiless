@@ -4,7 +4,7 @@ import { z } from "zod";
 import { chapterTitles } from "../model/chapterTitles";
 
 const props = defineProps<{ bookId: string }>();
-const emit = defineEmits<{ availability: [ready: boolean]; completed: [count: number] }>();
+const emit = defineEmits<{ availability: [ready: boolean]; changed: [] }>();
 const schema = z.object({
   chapter_count: z.number().int().nonnegative(),
   current_chapter: z.number().int().nullable(),
@@ -43,7 +43,6 @@ async function loadChapterTitles() {
 async function load() {
   const version = ++loadVersion;
   loading.value = true;
-  emit("availability", false);
   error.value = "";
   notice.value = "";
   try {
@@ -54,11 +53,12 @@ async function load() {
     if (!response.ok) throw new Error();
     const updated = schema.parse(await response.json());
     if (version !== loadVersion) return;
+    if (progress.value && progress.value.current_chapter !== updated.current_chapter)
+      emit("changed");
     progress.value = updated;
     chapters.value = titles ?? [];
     titlesUnavailable.value = titles === null;
     choice.value = progress.value.current_chapter?.toString() ?? "";
-    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
   } catch {
     if (version !== loadVersion) return;
@@ -85,7 +85,6 @@ async function save() {
     if (!response.ok) throw new Error();
     progress.value = schema.parse(await response.json());
     notice.value = "Reading progress saved.";
-    emit("completed", Math.max(0, (progress.value.current_chapter ?? 1) - 1));
     emit("availability", (progress.value.current_chapter ?? 0) > 1);
   } catch {
     error.value = "Could not save reading progress. Try again.";

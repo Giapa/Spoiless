@@ -13,6 +13,8 @@ from src.library import storage as library
 from src.library.epub import Book, Section
 from src.main import app
 
+pytestmark = pytest.mark.usefixtures("fake_embedding_model")
+
 
 class MemoryKeyring:
     def __init__(self):
@@ -128,6 +130,7 @@ def test_answer_api_returns_verified_text_without_unread_material(
     assert '{"insufficient_evidence":true}' in instructions
     assert json.loads(payload) == {
         "question": question,
+        "current_chapter": 2,
         "conversation": [],
         "passages": ["Mira found the key. "],
     }
@@ -1050,7 +1053,7 @@ def test_conversation_follows_reading_progress(reading_setup):
             ).status_code
             == 200
         )
-        assert client.get(f"/api/books/{book}/conversation").json() == original
+        assert client.get(f"/api/books/{book}/conversation").json() == []
         assert (
             client.put(
                 f"/api/books/{book}/progress", json={"current_chapter": 2}

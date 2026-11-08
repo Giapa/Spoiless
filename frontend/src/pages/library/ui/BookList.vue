@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
 import { z } from "zod";
-import PassageSearch from "./PassageSearch.vue";
 import BookQuestion from "./BookQuestion.vue";
 import ConversationHistory from "./ConversationHistory.vue";
-import BookRecap from "./BookRecap.vue";
 import type { Book } from "../api/libraryApi";
 import ReadingProgress from "./ReadingProgress.vue";
 
@@ -12,7 +10,6 @@ const props = defineProps<{ book?: Book; loading: boolean; busy: boolean; model:
 const emit = defineEmits<{ delete: [book: Book]; chaptersAnalyzed: [] }>();
 const searchAvailable = ref(false);
 const historyVersion = ref(0);
-const completedChapters = ref(0);
 const analyzing = ref(false);
 const analysisError = ref("");
 let analysisRequest: AbortController | null = null;
@@ -101,19 +98,12 @@ onBeforeUnmount(() => {
           <ReadingProgress
             :book-id="book.id"
             @availability="searchAvailable = $event"
-            @completed="completedChapters = $event"
+            @changed="historyVersion++"
           />
         </div>
         <div v-if="searchAvailable" class="conversation">
           <ConversationHistory :book-id="book.id" :version="historyVersion" />
           <BookQuestion :book-id="book.id" :model="model" @saved="historyVersion++" />
-          <div class="tools">
-            <PassageSearch :book-id="book.id" /><BookRecap
-              :book-id="book.id"
-              :model="model"
-              :completed="completedChapters"
-            />
-          </div>
         </div>
         <div v-else class="conversation">
           <div class="empty">
@@ -212,15 +202,6 @@ h3 {
 .unavailable button:disabled {
   opacity: 0.55;
   cursor: default;
-}
-.tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 24px;
-}
-.tools > * {
-  flex: 1 1 260px;
-  min-width: 0;
 }
 @media (max-width: 700px) {
   .chat {

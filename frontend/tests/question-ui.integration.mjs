@@ -201,7 +201,7 @@ test("a question cannot be sent until a model is selected", async () => {
   } finally { await browser.close(); }
 });
 
-test("leaving the window clears a displayed answer", async () => {
+test("leaving the window keeps a displayed answer", async () => {
   const { browser, page } = await openApp();
   try {
     await page.getByRole("button", { name: "Load available models" }).click();
@@ -210,7 +210,7 @@ test("leaving the window clears a displayed answer", async () => {
     await page.getByRole("button", { name: "Ask" }).click();
     await page.getByText("Mira found the key.").waitFor();
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-    await page.getByText("Mira found the key.").waitFor({ state: "hidden" });
+    await page.getByText("Mira found the key.").waitFor();
   } finally { await browser.close(); }
 });
 
@@ -256,7 +256,7 @@ test("moving backward hides the old conversation even after moving forward again
   } finally { await browser.close(); }
 });
 
-test("an open history updates after asking and closes when leaving the window", async () => {
+test("an open history remains visible after leaving the window", async () => {
   const { browser, page } = await openApp();
   try {
     const progress = page.getByRole("combobox", { name: "Current chapter" });
@@ -272,7 +272,7 @@ test("an open history updates after asking and closes when leaving the window", 
     await page.getByRole("button", { name: "Ask" }).click();
     await history.getByText("Where was the key?").waitFor();
     await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-    await history.getByText("No questions in this conversation yet.").waitFor();
+    await history.getByText("Where was the key?").waitFor();
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.getByRole("region", { name: "Conversation history" }).getByText("Where was the key?").waitFor();
   } finally { await browser.close(); }

@@ -239,10 +239,24 @@ def _navigation(
 _CHAPTER = re.compile(
     r"^\s*(?:chapter|chap\.|ch\.)\s*(?:\d+|[ivxlcdm]+|[a-z]+)?\b", re.I
 )
+_NUMBERED_TOC = re.compile(r"^(\d+)\s*:\s*(\S.*)$")
+
+
+def _toc_chapter_number(title: str, heading: str) -> int | None:
+    match = _NUMBERED_TOC.match(title.strip())
+    if match and heading.strip().casefold() in {
+        match.group(1),
+        match.group(2).strip().casefold(),
+        title.strip().casefold(),
+    }:
+        return int(match.group(1))
+    return None
+
+
 _NON_CHAPTER = re.compile(
-    r"^\s*(?:contents|table of contents|title page|copyright|dedication|"
+    r"^\s*(?:cover|maps?|contents|table of contents|title page|copyright|dedication|"
     r"foreword|preface|introduction|acknowledg(?:e)?ments|about|appendix|"
-    r"notes|bibliography|index|afterword|epilogue|prologue|part\s+(?:\d+|[ivxlcdm]+|[a-z]+))\b",
+    r"notes|bibliography|index|afterword|epilogue|prologue|excerpt|part\s+(?:\d+|[ivxlcdm]+|[a-z]+))\b",
     re.I,
 )
 
@@ -254,6 +268,8 @@ def _chapters(sections, navigation, headings):
     for section, offset, semantic in headings:
         text = sections[section].text[offset:].split("\n", 1)[0].strip()
         heading_text[(section, offset)] = text
+        if semantic and _NON_CHAPTER.match(text):
+            return ()
         if semantic or _CHAPTER.match(text):
             starts.add((section, offset))
     for entry in navigation:
@@ -265,9 +281,15 @@ def _chapters(sections, navigation, headings):
         title = entry.title.strip()
         if _NON_CHAPTER.match(title):
             continue
-        if _CHAPTER.match(title) or (
-            title and heading_text.get(point, "").casefold() == title.casefold()
+        if (
+            _CHAPTER.match(title)
+            or _toc_chapter_number(title, heading_text.get(point, "")) is not None
         ):
+            heading = heading_text.get(point, "")
+            if _NON_CHAPTER.match(heading) and not re.match(
+                r"^\s*part\b", heading, re.I
+            ):
+                return ()
             starts.add(point)
     if any(
         point not in starts and not _NON_CHAPTER.match(title)
@@ -301,13 +323,22 @@ def _chapters(sections, navigation, headings):
             for label in labels
             if (match := re.match(r"\s*(?:chapter|chap\.|ch\.)\s*(\d+)\b", label, re.I))
         ]
+        numeric.extend(
+            number
+            for label in labels
+            if (number := _toc_chapter_number(label, heading_text.get(point, "")))
+            is not None
+        )
         if any(_CHAPTER.match(label) for label in labels) and not numeric:
             return ()
         if numeric and len(set(numeric)) != 1:
             return ()
         numbers.append(numeric[0] if numeric else None)
-    known = [(index, number) for index, number in enumerate(numbers) if number]
-    if any(number != index + 1 for index, number in known):
+    known = [
+        (index, number) for index, number in enumerate(numbers) if number is not None
+    ]
+    starts_at_zero = bool(known and known[0] == (0, 0))
+    if any(number != index + 1 - starts_at_zero for index, number in known):
         return ()
     # ponytail: headings and TOC labels are heuristic; richer EPUB semantics can
     # improve detection when books without recognizable chapter markers need it.

@@ -194,3 +194,88 @@ def test_more_than_200_ambiguous_passages_are_batched(tmp_path, monkeypatch):
     chapter_analysis.analyze_chapters(book, "account", "model")
     assert sum(sizes) == 205 and max(sizes) <= 5
     assert len(storage.get_reading_units(book)) == 1
+
+
+def test_zero_numbered_first_chapter_and_gaps(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    valid = storage.add_book(
+        Book("Zero", (Section("Chapter 0\nRead"), Section("Chapter 1\nUnread")))
+    )
+    chapter_analysis.analyze_chapters(valid, "account", "model")
+    storage.set_progress(valid, 2)
+    assert "Unread" not in "".join(text for _, text in storage.eligible_text(valid))
+
+    gap = storage.add_book(
+        Book("Gap", (Section("Chapter 0\nRead"), Section("Chapter 2\nUnread")))
+    )
+    with pytest.raises(ValueError):
+        chapter_analysis.analyze_chapters(gap, "account", "model")
+    assert storage.get_reading_units(gap) == []
+
+
+def test_numbered_toc_titles_exclude_front_matter_and_parts_without_ai(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    book = storage.add_book(
+        Book(
+            "Book",
+            (
+                Section("Maps\nMap"),
+                Section("Part I\nHeading"),
+                Section("1\nRead"),
+                Section("2\nUnread"),
+            ),
+            (
+                NavigationEntry("Cover", None, None),
+                NavigationEntry("Maps", 0, 0),
+                NavigationEntry("Part I", 1, 0),
+                NavigationEntry("1: First", 2, 0),
+                NavigationEntry("2: Second", 3, 0),
+            ),
+        )
+    )
+    monkeypatch.setattr(
+        chapter_analysis,
+        "generate_response",
+        lambda *args: pytest.fail("Clear labels need no AI"),
+    )
+    chapter_analysis.analyze_chapters(book, "account", "model")
+    units = storage.get_reading_units(book)
+    assert [
+        (unit.section_position, unit.character_offset)
+        for unit in units
+        if unit.kind == "chapter"
+    ] == [
+        (2, 0),
+        (3, 0),
+    ]
+    storage.set_progress(book, 2)
+    assert "Unread" not in "".join(text for _, text in storage.eligible_text(book))
+
+
+def test_conflicting_chapter_label_and_front_matter_heading_uses_model(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    book = storage.add_book(
+        Book(
+            "Book",
+            (Section("Foreword\nText"), Section("Chapter 1\nRead")),
+            (NavigationEntry("Chapter 1", 0, 0), NavigationEntry("Chapter 1", 1, 0)),
+        )
+    )
+    calls = []
+
+    def classify(account, model, prompt):
+        calls.append(prompt)
+        return '{"boundaries":[false]}'
+
+    monkeypatch.setattr(chapter_analysis, "generate_response", classify)
+    chapter_analysis.analyze_chapters(book, "account", "model")
+    assert len(calls) == 1
+    assert [
+        unit.section_position
+        for unit in storage.get_reading_units(book)
+        if unit.kind == "chapter"
+    ] == [1]

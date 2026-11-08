@@ -20,6 +20,15 @@ from src.chatgpt.credentials import CredentialRecord
 from src.library import storage as library
 from src.library.epub import Book, NavigationEntry, Section
 from src.main import app
+from src.retrieval import embedding_model
+
+
+class FakeEmbeddingModel:
+    def embed(self, texts):
+        return ([1.0, 1.0] for _ in texts)
+
+
+embedding_model.load_model = lambda: FakeEmbeddingModel()
 
 
 class MemoryKeyring:

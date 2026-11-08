@@ -81,7 +81,7 @@ def _run_book_generation(
     from src.chatgpt.exchange import ExchangeError
     from src.chatgpt.inference import InferenceError
     from src.chatgpt.models import ModelCatalogError
-    from src.retrieval.search import ProgressChanged
+    from src.retrieval.search import ModelUnavailable, ProgressChanged
 
     _local_request(request, mutation=True)
     if not confirm:
@@ -101,6 +101,12 @@ def _run_book_generation(
         ) from None
     except ProgressChanged:
         raise HTTPException(409, "Reading progress changed. Please retry.") from None
+    except ModelUnavailable:
+        raise HTTPException(
+            503,
+            "Local search model unavailable. "
+            "Download it in Local search settings and retry.",
+        ) from None
     except AccountError:
         raise HTTPException(409, "This account needs to sign in again.") from None
     except (CredentialStoreError, SignInStartError):

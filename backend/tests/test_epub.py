@@ -239,6 +239,42 @@ def test_unclassified_navigation_might_hide_a_chapter():
     )
 
 
+def test_named_navigation_heading_is_not_assumed_to_be_a_chapter():
+    from src.library.epub import Section, _chapters
+
+    sections = (Section("Chapter 1\nRead\nDramatis Personae\nNames"),)
+    navigation = (
+        NavigationEntry("Chapter 1", 0, 0),
+        NavigationEntry("Dramatis Personae", 0, 15),
+    )
+    headings = ((0, 0, False), (0, 15, False))
+    assert _chapters(sections, navigation, headings) == ()
+
+
+def test_numbered_titles_in_toc_are_chapters_without_model():
+    from src.library.epub import Section, _chapters
+
+    sections = (Section("1\nRead"), Section("2\nUnread"))
+    navigation = (NavigationEntry("1: First", 0, 0), NavigationEntry("2: Second", 1, 0))
+    assert _chapters(sections, navigation, ((0, 0, False), (1, 0, False))) == (
+        (0, 0),
+        (1, 0),
+    )
+
+
+def test_zero_numbering_gap_and_conflicting_heading_fail_closed():
+    from src.library.epub import Section, _chapters
+
+    sections = (Section("0\nRead"), Section("2\nUnread"))
+    nav = (NavigationEntry("0: First", 0, 0), NavigationEntry("2: Second", 1, 0))
+    assert _chapters(sections, nav, ((0, 0, False), (1, 0, False))) == ()
+    sections = (Section("Foreword\nText"),)
+    assert (
+        _chapters(sections, (NavigationEntry("Chapter 1", 0, 0),), ((0, 0, False),))
+        == ()
+    )
+
+
 def test_detected_chapter_heading_is_available_as_title_without_navigation():
     book = read_epub(
         epub(
